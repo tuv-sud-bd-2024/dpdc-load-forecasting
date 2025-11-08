@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Forecast - DPDC OpenSTEF{% endblock %}
+
+{% block content %}
+<h1 class="page-title">
+    <i class="bi bi-graph-up-arrow"></i> Forecast
+</h1>
+
+<div class="row">
+    <!-- Form Section -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-calendar-check"></i> Forecast Parameters
+            </div>
+            <div class="card-body">
+                <form id="forecastForm">
+                    <div class="mb-3">
+                        <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="date" name="date" placeholder="Select date" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="hour" class="form-label">Hour <span class="text-danger">*</span></label>
+                        <select class="form-select" id="hour" name="hour" required>
+                            <option value="">Select hour...</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="holiday" class="form-label">Holiday <span class="text-danger">*</span></label>
+                            <select class="form-select" id="holiday" name="holiday" required>
+                                <option value="0" selected>0 (No)</option>
+                                <option value="1">1 (Yes)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="holiday_type" class="form-label">Holiday Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="holiday_type" name="holiday_type" required>
+                                <option value="0" selected>0</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="nation_event" class="form-label">Nation Event <span class="text-danger">*</span></label>
+                        <select class="form-select" id="nation_event" name="nation_event" required>
+                            <option value="0" selected>0</option>
+                        </select>
+                    </div>
+
+                    <!-- Fetch Weather Button -->
+                    <div class="d-grid mb-3">
+                        <button type="button" class="btn btn-secondary" id="fetchWeatherBtn">
+                            <i class="bi bi-cloud-sun"></i> Fetch Weather Data
+                        </button>
+                    </div>
+
+                    <!-- Weather Data Table -->
+                    <div id="weatherDataSection" style="display: none;">
+                        <h6 class="section-title">Weather Data</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="weatherDataTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Alert Messages -->
+                    <div id="alertContainer"></div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary" id="forecastBtn">
+                            <i class="bi bi-lightning-charge"></i> Generate Forecast
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="col-lg-7">
+        <!-- Forecast Results Table -->
+        <div class="card" id="resultsCard" style="display: none;">
+            <div class="card-header">
+                <i class="bi bi-table"></i> Forecast Results
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Model Name</th>
+                                <th>Forecasted Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Forecast Chart -->
+        <div class="card" id="chartCard" style="display: none;">
+            <div class="card-header">
+                <i class="bi bi-bar-chart-line"></i> 24-Hour Forecast Chart
+            </div>
+            <div class="card-body">
+                <div id="forecastChart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let weatherData = {};
+
+$(document).ready(function() {
+    // Initialize date picker
+    flatpickr("#date", {
+        dateFormat: "Y-m-d",
+        defaultDate: new Date()
+    });
+
+    // Initialize hour select with Select2
+    const hourOptions = [];
+    for (let i = 0; i < 24; i++) {
+        hourOptions.push(`<option value="${i}">${i}</option>`);
+    }
+    $('#hour').html('<option value="">Select hour...</option>' + hourOptions.join(''));
+    $('#hour').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Select hour...'
+    });
+
+    // Populate holiday_type select
+    const holidayTypeOptions = [];
+    for (let i = 0; i <= 20; i++) {
+        holidayTypeOptions.push(`<option value="${i}" ${i === 0 ? 'selected' : ''}>${i}</option>`);
+    }
+    $('#holiday_type').html(holidayTypeOptions.join(''));
+
+    // Populate nation_event select
+    const nationEventOptions = [];
+    for (let i = 0; i <= 5; i++) {
+        nationEventOptions.push(`<option value="${i}" ${i === 0 ? 'selected' : ''}>${i}</option>`);
+    }
+    $('#nation_event').html(nationEventOptions.join(''));
+
+    // Fetch Weather Data
+    $('#fetchWeatherBtn').on('click', function() {
+        const date = $('#date').val();
+        const hour = $('#hour').val();
+
+        if (!date || !hour) {
+            showAlert('Please select both date and hour before fetching weather data.', 'warning');
+            return;
+        }
+
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+        $btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Fetching...');
+
+        fetch(`/api/weather?date=${date}&hour=${hour}`)
+            .then(response => response.json())
+            .then(data => {
+                weatherData = data;
+                displayWeatherData(data);
+                $('#weatherDataSection').slideDown();
+                
+                $btn.prop('disabled', false);
+                $btn.html('<i class="bi bi-cloud-sun"></i> Fetch Weather Data');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Failed to fetch weather data.', 'danger');
+                
+                $btn.prop('disabled', false);
+                $btn.html('<i class="bi bi-cloud-sun"></i> Fetch Weather Data');
+            });
+    });
+
+    // Form submission
+    $('#forecastForm').on('submit', function(e) {
+        e.preventDefault();
+
+        if (Object.keys(weatherData).length === 0) {
+            showAlert('Please fetch weather data before generating forecast.', 'warning');
+            return;
+        }
+
+        const $forecastBtn = $('#forecastBtn');
+        $forecastBtn.prop('disabled', true);
+        $forecastBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Generating...');
+
+        const formData = new FormData();
+        formData.append('date', $('#date').val());
+        formData.append('hour', $('#hour').val());
+        formData.append('holiday', $('#holiday').val());
+        formData.append('holiday_type', $('#holiday_type').val());
+        formData.append('nation_event', $('#nation_event').val());
+        formData.append('weather_data', JSON.stringify(weatherData));
+
+        fetch('/api/forecast', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            displayForecastResults(data);
+            fetchAndDisplayChart($('#date').val(), $('#hour').val());
+            
+            $forecastBtn.prop('disabled', false);
+            $forecastBtn.html('<i class="bi bi-lightning-charge"></i> Generate Forecast');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Failed to generate forecast.', 'danger');
+            
+            $forecastBtn.prop('disabled', false);
+            $forecastBtn.html('<i class="bi bi-lightning-charge"></i> Generate Forecast');
+        });
+    });
+
+    function displayWeatherData(data) {
+        let tableHtml = '';
+        const weatherParams = {
+            'temp': 'Temperature (°C)',
+            'rhum': 'Relative Humidity (%)',
+            'prcp': 'Precipitation (mm)',
+            'wdir': 'Wind Direction (°)',
+            'wspd': 'Wind Speed (m/s)',
+            'pres': 'Pressure (hPa)',
+            'cldc': 'Cloud Cover (%)',
+            'coco': 'Condition Code'
+        };
+
+        for (const [key, label] of Object.entries(weatherParams)) {
+            tableHtml += `
+                <tr>
+                    <td><strong>${label}</strong></td>
+                    <td>${data[key]}</td>
+                </tr>
+            `;
+        }
+
+        $('#weatherDataTable').html(tableHtml);
+    }
+
+    function displayForecastResults(data) {
+        let tableHtml = '';
+        data.forEach(result => {
+            tableHtml += `
+                <tr>
+                    <td><strong>${result.model_name}</strong></td>
+                    <td>${result.forecasted_value.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        $('#resultsTable').html(tableHtml);
+        $('#resultsCard').slideDown();
+    }
+
+    function fetchAndDisplayChart(date, hour) {
+        fetch(`/api/forecast-chart?date=${date}&hour=${hour}`)
+            .then(response => response.json())
+            .then(data => {
+                const traces = [
+                    {
+                        x: data.hours,
+                        y: data.xgboost,
+                        name: 'XGBoost',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: '#667eea', width: 2 },
+                        marker: { size: 6 }
+                    },
+                    {
+                        x: data.hours,
+                        y: data.lightgbm,
+                        name: 'LightGBM',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: '#764ba2', width: 2 },
+                        marker: { size: 6 }
+                    },
+                    {
+                        x: data.hours,
+                        y: data.ensemble,
+                        name: 'Ensemble',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: '#f093fb', width: 3 },
+                        marker: { size: 8 }
+                    }
+                ];
+
+                const layout = {
+                    title: '24-Hour Load Forecast',
+                    xaxis: {
+                        title: 'Hour of Day',
+                        tickmode: 'linear',
+                        tick0: 0,
+                        dtick: 2
+                    },
+                    yaxis: {
+                        title: 'Load (MW)'
+                    },
+                    hovermode: 'x unified',
+                    showlegend: true,
+                    legend: {
+                        x: 0.02,
+                        y: 0.98,
+                        bgcolor: 'rgba(255, 255, 255, 0.8)',
+                        bordercolor: '#ddd',
+                        borderwidth: 1
+                    },
+                    margin: { t: 50, b: 50, l: 60, r: 30 }
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: true,
+                    displaylogo: false
+                };
+
+                Plotly.newPlot('forecastChart', traces, layout, config);
+                $('#chartCard').slideDown();
+            })
+            .catch(error => {
+                console.error('Error fetching chart data:', error);
+            });
+    }
+
+    function showAlert(message, type) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#alertContainer').html(alertHtml);
+        
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}
+

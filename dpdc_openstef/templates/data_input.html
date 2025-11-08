@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Data Input - DPDC OpenSTEF{% endblock %}
+
+{% block content %}
+<h1 class="page-title">
+    <i class="bi bi-table"></i> Data Input
+</h1>
+
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-calendar3"></i> Select Date
+            </div>
+            <div class="card-body">
+                <div class="row align-items-end mb-4">
+                    <div class="col-md-6">
+                        <label for="dateSelector" class="form-label">Date <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="dateSelector" placeholder="Select date">
+                    </div>
+                    <div class="col-md-6">
+                        <button type="button" class="btn btn-primary" id="loadDataBtn">
+                            <i class="bi bi-arrow-clockwise"></i> Load Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Alert Messages -->
+                <div id="alertContainer"></div>
+
+                <!-- Data Table -->
+                <div id="dataTableSection" style="display: none;">
+                    <h5 class="section-title">Hourly Data</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%;">Hour</th>
+                                    <th style="width: 40%;">Predicted</th>
+                                    <th style="width: 40%;">Actual</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Update Button -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="button" class="btn btn-success btn-lg" id="updateBtn">
+                            <i class="bi bi-check-circle"></i> Update
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Status Card -->
+        <div class="card" id="statusCard" style="display: none;">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle-fill"></i> Update Status
+            </div>
+            <div class="card-body">
+                <div id="statusContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentDate = '';
+let hourlyData = [];
+
+$(document).ready(function() {
+    // Initialize date picker
+    flatpickr("#dateSelector", {
+        dateFormat: "Y-m-d",
+        defaultDate: new Date(),
+        onChange: function(selectedDates, dateStr, instance) {
+            currentDate = dateStr;
+        }
+    });
+
+    // Set initial date
+    currentDate = new Date().toISOString().split('T')[0];
+    $('#dateSelector').val(currentDate);
+
+    // Load Data Button
+    $('#loadDataBtn').on('click', function() {
+        if (!currentDate) {
+            showAlert('Please select a date.', 'warning');
+            return;
+        }
+
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+        $btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Loading...');
+
+        fetch(`/api/data-input?date=${currentDate}`)
+            .then(response => response.json())
+            .then(data => {
+                hourlyData = data.data;
+                displayDataTable(data.data);
+                $('#dataTableSection').slideDown();
+                
+                $btn.prop('disabled', false);
+                $btn.html('<i class="bi bi-arrow-clockwise"></i> Load Data');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Failed to load data.', 'danger');
+                
+                $btn.prop('disabled', false);
+                $btn.html('<i class="bi bi-arrow-clockwise"></i> Load Data');
+            });
+    });
+
+    // Update Button
+    $('#updateBtn').on('click', function() {
+        // Collect current table data
+        const updatedData = [];
+        $('#dataTableBody tr').each(function() {
+            const hour = parseInt($(this).find('.hour-cell').text());
+            const predicted = parseFloat($(this).find('.predicted-input').val()) || 0;
+            const actual = parseFloat($(this).find('.actual-input').val()) || 0;
+            
+            updatedData.push({
+                hour: hour,
+                predicted: predicted,
+                actual: actual
+            });
+        });
+
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+        $btn.html('<span class="spinner-border spinner-border-sm me-2"></span>Updating...');
+
+        const formData = new FormData();
+        formData.append('date', currentDate);
+        formData.append('hourly_data', JSON.stringify(updatedData));
+
+        fetch('/api/data-input', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            showAlert('Data updated successfully!', 'success');
+            displayUpdateStatus(data);
+            
+            $btn.prop('disabled', false);
+            $btn.html('<i class="bi bi-check-circle"></i> Update');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Failed to update data.', 'danger');
+            
+            $btn.prop('disabled', false);
+            $btn.html('<i class="bi bi-check-circle"></i> Update');
+        });
+    });
+
+    function displayDataTable(data) {
+        let tableHtml = '';
+        
+        for (let i = 0; i < 24; i++) {
+            const hourData = data.find(d => d.hour === i) || { hour: i, predicted: 0, actual: 0 };
+            
+            tableHtml += `
+                <tr>
+                    <td class="hour-cell text-center align-middle">
+                        <strong>${i}</strong>
+                    </td>
+                    <td>
+                        <input type="number" 
+                               class="form-control predicted-input" 
+                               value="${hourData.predicted}" 
+                               step="0.01"
+                               placeholder="0.00">
+                    </td>
+                    <td>
+                        <input type="number" 
+                               class="form-control actual-input" 
+                               value="${hourData.actual}" 
+                               step="0.01"
+                               placeholder="0.00">
+                    </td>
+                </tr>
+            `;
+        }
+        
+        $('#dataTableBody').html(tableHtml);
+    }
+
+    function displayUpdateStatus(data) {
+        const statusHtml = `
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="text-muted mb-2">Date</h6>
+                    <p class="h5 mb-3">${currentDate}</p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted mb-2">Records Updated</h6>
+                    <p class="h5 mb-3">
+                        <span class="badge bg-success">${data.records_updated}</span>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted mb-2">Status</h6>
+                    <p class="h5 mb-3">
+                        <span class="badge bg-success">Success</span>
+                    </p>
+                </div>
+            </div>
+            <hr>
+            <p class="mb-0 text-muted">
+                <i class="bi bi-info-circle"></i> ${data.message}
+            </p>
+        `;
+        
+        $('#statusContent').html(statusHtml);
+        $('#statusCard').slideDown();
+        
+        // Hide after 5 seconds
+        setTimeout(() => {
+            $('#statusCard').slideUp();
+        }, 5000);
+    }
+
+    function showAlert(message, type) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#alertContainer').html(alertHtml);
+        
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}
+

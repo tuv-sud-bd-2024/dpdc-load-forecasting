@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Train Model - DPDC OpenSTEF{% endblock %}
+
+{% block content %}
+<h1 class="page-title">
+    <i class="bi bi-gear-fill"></i> Train Model
+</h1>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-sliders"></i> Model Configuration
+            </div>
+            <div class="card-body">
+                <form id="trainForm">
+                    <!-- Model Selection -->
+                    <div class="mb-4">
+                        <label for="model" class="form-label">Model <span class="text-danger">*</span></label>
+                        <select class="form-select" id="model" name="model" required>
+                            <option value="">Select a model...</option>
+                            <option value="xgb">XGBoost (XGB)</option>
+                            <option value="lgb">LightGBM (LGB)</option>
+                        </select>
+                    </div>
+
+                    <!-- Hyperparameters Section -->
+                    <div id="hyperparamsSection" style="display: none;">
+                        <h5 class="section-title">
+                            <i class="bi bi-sliders2"></i> Hyperparameters
+                        </h5>
+                        
+                        <!-- XGBoost Hyperparameters -->
+                        <div id="xgbParams" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_max_depth" class="form-label">Max Depth</label>
+                                    <input type="number" class="form-control" id="xgb_max_depth" 
+                                           placeholder="e.g., 6" min="1" max="20" value="6">
+                                    <small class="text-muted">Maximum tree depth (1-20)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_learning_rate" class="form-label">Learning Rate</label>
+                                    <input type="number" class="form-control" id="xgb_learning_rate" 
+                                           placeholder="e.g., 0.1" step="0.001" min="0.001" max="1" value="0.1">
+                                    <small class="text-muted">Step size shrinkage (0.001-1)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_n_estimators" class="form-label">N Estimators</label>
+                                    <input type="number" class="form-control" id="xgb_n_estimators" 
+                                           placeholder="e.g., 100" min="10" max="10000" value="100">
+                                    <small class="text-muted">Number of boosting rounds (10-10000)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_early_stopping_rounds" class="form-label">Early Stopping Rounds</label>
+                                    <input type="number" class="form-control" id="xgb_early_stopping_rounds" 
+                                           placeholder="e.g., 10" min="1" max="100" value="10">
+                                    <small class="text-muted">Stop if no improvement (1-100)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LightGBM Hyperparameters -->
+                        <div id="lgbParams" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_n_estimators" class="form-label">N Estimators</label>
+                                    <input type="number" class="form-control" id="lgb_n_estimators" 
+                                           placeholder="e.g., 100" min="10" max="10000" value="100">
+                                    <small class="text-muted">Number of boosting rounds (10-10000)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_learning_rate" class="form-label">Learning Rate</label>
+                                    <input type="number" class="form-control" id="lgb_learning_rate" 
+                                           placeholder="e.g., 0.1" step="0.001" min="0.001" max="1" value="0.1">
+                                    <small class="text-muted">Step size shrinkage (0.001-1)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_num_leaves" class="form-label">Num Leaves</label>
+                                    <input type="number" class="form-control" id="lgb_num_leaves" 
+                                           placeholder="e.g., 31" min="2" max="1000" value="31">
+                                    <small class="text-muted">Maximum tree leaves (2-1000)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_max_depth" class="form-label">Max Depth</label>
+                                    <input type="number" class="form-control" id="lgb_max_depth" 
+                                           placeholder="e.g., -1" value="-1">
+                                    <small class="text-muted">Maximum tree depth (-1 for no limit)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_max_bin" class="form-label">Max Bin</label>
+                                    <input type="number" class="form-control" id="lgb_max_bin" 
+                                           placeholder="e.g., 255" min="2" max="1000" value="255">
+                                    <small class="text-muted">Max number of bins (2-1000)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alert Messages -->
+                    <div id="alertContainer"></div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg" id="trainBtn">
+                            <i class="bi bi-play-circle-fill"></i> Start Training
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Training Status Card (shown after submission) -->
+        <div class="card" id="statusCard" style="display: none;">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle-fill"></i> Training Status
+            </div>
+            <div class="card-body">
+                <div id="statusContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Model selection change handler
+    $('#model').on('change', function() {
+        const selectedModel = $(this).val();
+        
+        // Hide all hyperparameter sections
+        $('#hyperparamsSection').hide();
+        $('#xgbParams').hide();
+        $('#lgbParams').hide();
+        
+        // Show appropriate hyperparameter section
+        if (selectedModel === 'xgb') {
+            $('#hyperparamsSection').show();
+            $('#xgbParams').show();
+        } else if (selectedModel === 'lgb') {
+            $('#hyperparamsSection').show();
+            $('#lgbParams').show();
+        }
+    });
+
+    // Form submission handler
+    $('#trainForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const model = $('#model').val();
+        
+        if (!model) {
+            showAlert('Please select a model', 'danger');
+            return;
+        }
+        
+        // Collect hyperparameters based on selected model
+        let hyperparams = {};
+        
+        if (model === 'xgb') {
+            hyperparams = {
+                max_depth: parseInt($('#xgb_max_depth').val()),
+                learning_rate: parseFloat($('#xgb_learning_rate').val()),
+                n_estimators: parseInt($('#xgb_n_estimators').val()),
+                early_stopping_rounds: parseInt($('#xgb_early_stopping_rounds').val())
+            };
+        } else if (model === 'lgb') {
+            hyperparams = {
+                n_estimators: parseInt($('#lgb_n_estimators').val()),
+                learning_rate: parseFloat($('#lgb_learning_rate').val()),
+                num_leaves: parseInt($('#lgb_num_leaves').val()),
+                max_depth: parseInt($('#lgb_max_depth').val()),
+                max_bin: parseInt($('#lgb_max_bin').val())
+            };
+        }
+        
+        // Disable submit button and show loading state
+        const $trainBtn = $('#trainBtn');
+        $trainBtn.prop('disabled', true);
+        $trainBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Training...');
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('model', model);
+        formData.append('hyperparams', JSON.stringify(hyperparams));
+        
+        // Submit to API
+        fetch('/api/train', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Show success message
+            showAlert('Training initiated successfully!', 'success');
+            
+            // Display training status
+            displayTrainingStatus(data);
+            
+            // Re-enable submit button
+            $trainBtn.prop('disabled', false);
+            $trainBtn.html('<i class="bi bi-play-circle-fill"></i> Start Training');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('An error occurred while submitting the training request.', 'danger');
+            
+            // Re-enable submit button
+            $trainBtn.prop('disabled', false);
+            $trainBtn.html('<i class="bi bi-play-circle-fill"></i> Start Training');
+        });
+    });
+
+    function showAlert(message, type) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        $('#alertContainer').html(alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+
+    function displayTrainingStatus(data) {
+        const modelName = data.model === 'xgb' ? 'XGBoost' : 'LightGBM';
+        
+        let paramsHtml = '<ul class="list-unstyled mb-0">';
+        for (const [key, value] of Object.entries(data.hyperparameters)) {
+            paramsHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+        }
+        paramsHtml += '</ul>';
+        
+        const statusHtml = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Model</h6>
+                    <p class="h5 mb-3">${modelName}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Status</h6>
+                    <p class="h5 mb-3">
+                        <span class="badge bg-success">In Progress</span>
+                    </p>
+                </div>
+            </div>
+            <hr>
+            <h6 class="text-muted mb-2">Hyperparameters</h6>
+            ${paramsHtml}
+        `;
+        
+        $('#statusContent').html(statusHtml);
+        $('#statusCard').slideDown();
+    }
+});
+</script>
+{% endblock %}
+

@@ -26,9 +26,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p logs static templates trained_models
-
 # Expose the port the app runs on
 EXPOSE 8080
 

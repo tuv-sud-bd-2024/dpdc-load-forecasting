@@ -210,6 +210,23 @@ class ModelService:
         
         all_forecasts = []
         
+        # Extract actual load data for the 24 hours (if available)
+        actual_loads = []
+        for hour in range(24):
+            forecast_timestamp = create_utc_datetime(date, hour)
+            # Check if this timestamp exists in the input data
+            if forecast_timestamp in input_data.index:
+                actual_load = input_data.loc[forecast_timestamp, 'load']
+                actual_loads.append({
+                    "timestamp": create_utc_datetime(date, hour, timezone(timedelta(hours=6))).isoformat(),
+                    "load": float(actual_load) if pd.notna(actual_load) else None
+                })
+            else:
+                actual_loads.append({
+                    "timestamp": create_utc_datetime(date, hour, timezone(timedelta(hours=6))).isoformat(),
+                    "load": None
+                })
+        
         # Loop through each model sequentially
         for custom_name in custom_names:
             logger.info(f"Starting forecast for model: {custom_name}")
@@ -238,7 +255,10 @@ class ModelService:
             logger.info(f"Completed forecast for model: {custom_name}")
         
         logger.info(f"Completed forecasts for all {len(custom_names)} models")
-        return {"all_forecasts": all_forecasts}
+        return {
+            "all_forecasts": all_forecasts,
+            "actual_loads": actual_loads
+        }
 
 def _forecast_24_hours(custom_name: str, to_forecast_data: pd.DataFrame) -> pd.DataFrame:
     """

@@ -70,6 +70,16 @@
 
     <!-- Results Section -->
     <div class="col-lg-7">
+        <!-- Forecast Chart -->
+        <div class="card" id="chartCard" style="display: none;">
+            <div class="card-header">
+                <i class="bi bi-bar-chart-line"></i> Forecast Comparison Chart
+            </div>
+            <div class="card-body">
+                <div id="forecastChart"></div>
+            </div>
+        </div>
+
         <!-- Forecast Results Table -->
         <div class="card" id="resultsCard" style="display: none;">
             <div class="card-header">
@@ -165,8 +175,9 @@ $(document).ready(function() {
     });
 
     function displayForecastResults(data) {
-        // data structure: {all_forecasts: [{custom_name: "model1", model_forecasts: [{timestamp, forecast}]}]}
+        // data structure: {all_forecasts: [{custom_name: "model1", model_forecasts: [{timestamp, forecast}]}], actual_loads: [{timestamp, load}]}
         const allForecasts = data.all_forecasts;
+        const actualLoads = data.actual_loads || [];
         
         if (!allForecasts || allForecasts.length === 0) {
             showAlert('No forecast data returned.', 'warning');
@@ -175,6 +186,9 @@ $(document).ready(function() {
 
         // Build table header with Hour column and one column per model
         let headerHtml = '<tr><th>Hour</th>';
+        if (actualLoads.length > 0 && actualLoads.some(a => a.load !== null)) {
+            headerHtml += '<th>Actual Load (MW)</th>';
+        }
         allForecasts.forEach(modelData => {
             headerHtml += `<th>Forecast ${modelData.custom_name} (MW)</th>`;
         });
@@ -188,6 +202,12 @@ $(document).ready(function() {
         for (let hourIdx = 0; hourIdx < numHours; hourIdx++) {
             bodyHtml += `<tr><td><strong>${hourIdx}</strong></td>`;
             
+            // Add actual load value if available
+            if (actualLoads.length > 0 && actualLoads.some(a => a.load !== null)) {
+                const actualLoad = actualLoads[hourIdx]?.load;
+                bodyHtml += `<td>${actualLoad !== null && actualLoad !== undefined ? actualLoad.toFixed(2) : 'N/A'}</td>`;
+            }
+            
             // Add forecast value for each model
             allForecasts.forEach(modelData => {
                 const forecastValue = modelData.model_forecasts[hourIdx].forecast;
@@ -198,13 +218,131 @@ $(document).ready(function() {
         }
 
         $('#resultsTableBody').html(bodyHtml);
+        
+        // Create Plotly chart
+        createForecastChart(allForecasts, actualLoads);
+        
+        // Show both chart and table
+        $('#chartCard').slideDown(400);
         $('#resultsCard').slideDown(400, function() {
-            // Scroll to the results card and focus on it after slide down animation completes
+            // Scroll to the chart card and focus on it after slide down animation completes
             $('html, body').animate({
-                scrollTop: $('#resultsCard').offset().top - 20
+                scrollTop: $('#chartCard').offset().top - 20
             }, 600);
-            $('#resultsCard').focus();
+            $('#chartCard').focus();
         });
+    }
+
+    function createForecastChart(allForecasts, actualLoads) {
+        const hours = Array.from({length: 24}, (_, i) => i);
+        const traces = [];
+        
+        // Add actual load trace if available
+        if (actualLoads.length > 0 && actualLoads.some(a => a.load !== null)) {
+            const actualLoadValues = actualLoads.map(a => a.load);
+            traces.push({
+                x: hours,
+                y: actualLoadValues,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Actual Load',
+                line: {
+                    color: 'rgb(0, 0, 0)',
+                    width: 3,
+                    dash: 'solid'
+                },
+                marker: {
+                    size: 8,
+                    color: 'rgb(0, 0, 0)'
+                }
+            });
+        }
+        
+        // Add traces for each model's forecast
+        const colors = [
+            'rgb(31, 119, 180)', // blue
+            'rgb(255, 127, 14)', // orange
+            'rgb(44, 160, 44)',  // green
+            'rgb(214, 39, 40)',  // red
+            'rgb(148, 103, 189)', // purple
+            'rgb(140, 86, 75)',  // brown
+            'rgb(227, 119, 194)', // pink
+            'rgb(127, 127, 127)', // gray
+            'rgb(188, 189, 34)',  // olive
+            'rgb(23, 190, 207)'   // cyan
+        ];
+        
+        allForecasts.forEach((modelData, idx) => {
+            const forecastValues = modelData.model_forecasts.map(f => f.forecast);
+            const color = colors[idx % colors.length];
+            
+            traces.push({
+                x: hours,
+                y: forecastValues,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `Forecast ${modelData.custom_name}`,
+                line: {
+                    color: color,
+                    width: 2
+                },
+                marker: {
+                    size: 6
+                }
+            });
+        });
+        
+        const layout = {
+            title: {
+                text: 'Load Forecast Comparison',
+                font: {
+                    size: 18,
+                    family: 'Arial, sans-serif'
+                }
+            },
+            xaxis: {
+                title: 'Hour of Day',
+                tickmode: 'linear',
+                tick0: 0,
+                dtick: 2,
+                gridcolor: 'rgba(0, 0, 0, 0.1)'
+            },
+            yaxis: {
+                title: 'Load (MW)',
+                gridcolor: 'rgba(0, 0, 0, 0.1)'
+            },
+            hovermode: 'x unified',
+            legend: {
+                x: 1.05,
+                y: 1,
+                xanchor: 'left',
+                yanchor: 'top',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                bordercolor: 'rgba(0, 0, 0, 0.1)',
+                borderwidth: 1
+            },
+            plot_bgcolor: 'rgba(0, 0, 0, 0)',
+            paper_bgcolor: 'white',
+            margin: {
+                l: 60,
+                r: 150,
+                t: 60,
+                b: 60
+            },
+            font: {
+                family: 'Arial, sans-serif',
+                size: 12
+            }
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+        };
+        
+        Plotly.newPlot('forecastChart', traces, layout, config);
     }
 
     function showAlert(message, type) {

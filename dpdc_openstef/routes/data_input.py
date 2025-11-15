@@ -39,12 +39,16 @@ async def get_data_input(date: str):
 @router.post("/api/data-input")
 async def update_data_input(
     date: str = Form(...),
-    hourly_data: str = Form(...)
+    hourly_data: str = Form(...),
+    holiday: int = Form(...),
+    holiday_type: int = Form(...),
+    nation_event: int = Form(...)
 ):
     """API endpoint for updating predicted and actual data"""
     data_list = json.loads(hourly_data)
     
     logger.info(f"Updating data for date: {date} with {len(data_list)} records")
+    logger.info(f"Holiday: {holiday}, Holiday Type: {holiday_type}, National Event: {nation_event}")
     logger.debug(f"Hourly data: {data_list}")
     
     logger.info(f"Data updated successfully for {date}")
@@ -52,6 +56,9 @@ async def update_data_input(
     return JSONResponse({
         "status": "success",
         "message": f"Data updated successfully for {date}",
-        "records_updated": len(data_list)
+        "records_updated": len(data_list),
+        "holiday": holiday,
+        "holiday_type": holiday_type,
+        "nation_event": nation_event
     })
 

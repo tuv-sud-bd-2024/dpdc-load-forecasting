@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
+import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from fastapi import UploadFile
 from openstef.data_classes.prediction_job import PredictionJobDataClass
 from openstef.pipeline.train_model import train_model_pipeline
 from openstef.pipeline.create_forecast import create_forecast_pipeline
@@ -111,6 +113,132 @@ class ModelService:
             artifact_folder=f"{PARENT_DIR}/{custom_name}/mlflow_artifacts",
         )
         return "hello"
+    
+    @staticmethod
+    async def train_model_with_hyperparams(
+        model: str, 
+        custom_name: str, 
+        training_data_start_date: str, 
+        training_data_end_date: str, 
+        hyperparams_dict: Dict[str, Any],
+        training_data_file: Optional[UploadFile] = None
+    ) -> str:
+        """
+        Train a model with comprehensive hyperparameters
+        
+        Args:
+            model: Model type ('xgb' or 'lgb')
+            custom_name: Custom name for the model
+            training_data_start_date: Start date for training data
+            training_data_end_date: End date for training data
+            hyperparams_dict: Dictionary of hyperparameters
+            training_data_file: Optional uploaded training data file (ignored as per requirements)
+            
+        Returns:
+            Status message
+        """
+        pd.options.plotting.backend = 'plotly'
+        
+        # Create PredictionJobDataClass with proper model type and hyperparameters
+        pj_dict = dict(
+            id=101,
+            model=model,  # Use the actual model type from parameter
+            forecast_type="demand",
+            horizon_minutes=120,
+            resolution_minutes=60,
+            name=custom_name,  # Use the custom name
+            save_train_forecasts=True,
+            ignore_existing_models=True,
+            model_kwargs=hyperparams_dict,  # Use all hyperparameters from the dictionary
+            quantiles=[0.1, 0.5, 0.9]
+        )
+        
+        logger.info(f"Creating PredictionJobDataClass with model={model}, name={custom_name}")
+        logger.debug(f"Model kwargs: {hyperparams_dict}")
+        
+        pj = PredictionJobDataClass(**pj_dict)
+        
+        # Load training data from default path (file upload is ignored as per requirements)
+        input_data = pd.read_csv(TRAINING_DATA_PATH, index_col=0, parse_dates=True)
+        
+        # Drop unnecessary columns if they exist
+        columns_to_drop = []
+        if "date_time_com" in input_data.columns:
+            columns_to_drop.append("date_time_com")
+        if "forecasted_load" in input_data.columns:
+            columns_to_drop.append("forecasted_load")
+        
+        if columns_to_drop:
+            input_data = input_data.drop(columns=columns_to_drop)
+        
+        pd.options.display.max_columns = None
+        logger.debug(f"Input data head:\n{input_data.head()}")
+        
+        # Filter data based on provided date range
+        start_date = create_utc_datetime(training_data_start_date, 0)
+        end_date = create_utc_datetime(training_data_end_date, 23)
+        
+        # Filter the input data to the specified date range
+        train_data = input_data[(input_data.index >= start_date) & (input_data.index <= end_date)]
+        
+        logger.info(f"Training data starting hour: {train_data.head(1).index}")
+        logger.info(f"Training data ending hour: {train_data.tail(1).index}")
+        logger.info(f"Training data filtered from {training_data_start_date} to {training_data_end_date}")
+        
+        # Remove duplicate index values
+        train_data = train_data[~train_data.index.duplicated(keep='first')]
+        
+        # Remove rows with NaT in the index
+        train_data = train_data[train_data.index.notna()]
+        
+        # Create directory structure for saving the model
+        path_to_create = f"./{PARENT_DIR}/{custom_name}/"
+        
+        try:
+            os.makedirs(path_to_create, exist_ok=True)
+            logger.info(f"Directory structure '{path_to_create}' created successfully.")
+        except OSError as e:
+            logger.error(f"Error creating directory structure: {e}")
+            raise
+        
+        # Store PredictionJob for later use
+        dictionary_path = f"./{PARENT_DIR}/{custom_name}/pj.pkl"
+        with open(dictionary_path, "wb") as file:
+            pickle.dump(pj, file, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        logger.info(f"PredictionJob saved to {dictionary_path}")
+        
+        # Save training metadata to JSON file
+        metadata = {
+            "model": model,
+            "custom_name": custom_name,
+            "training_data_start_date": training_data_start_date,
+            "training_data_end_date": training_data_end_date,
+            "hyperparameters": hyperparams_dict,
+            "trained_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        metadata_path = f"./{PARENT_DIR}/{custom_name}/training_metadata.json"
+        with open(metadata_path, "w") as file:
+            json.dump(metadata, file, indent=4)
+        
+        logger.info(f"Training metadata saved to {metadata_path}")
+        
+        # Set up MLflow tracking
+        mlflow_tracking_uri = f"{PARENT_DIR}/{custom_name}/mlflow_trained_models"
+        
+        # Train the model
+        logger.info(f"Starting model training for {model} with custom name '{custom_name}'")
+        train_data, validation_data, test_data = train_model_pipeline(
+            pj,
+            train_data,
+            check_old_model_age=False,
+            mlflow_tracking_uri=mlflow_tracking_uri,
+            artifact_folder=f"{PARENT_DIR}/{custom_name}/mlflow_artifacts",
+        )
+        
+        logger.info(f"Model training completed successfully for '{custom_name}'")
+        return "Training completed successfully"
     
     @staticmethod
     async def forecast_from_model(custom_name: str, date: str, hour: int) -> Dict[str, Any]:

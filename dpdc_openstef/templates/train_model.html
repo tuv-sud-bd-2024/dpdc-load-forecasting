@@ -8,7 +8,7 @@
 </h1>
 
 <div class="row">
-    <div class="col-lg-8 mx-auto">
+    <div class="col-lg-6 col-xl-6 mx-auto">
         <div class="card">
             <div class="card-header">
                 <i class="bi bi-sliders"></i> Model Configuration
@@ -29,19 +29,27 @@
                         <input type="text" class="form-control" id="custom_name" required>
                     </div>
 
+                    <!-- Training Data File Upload -->
+                    <div class="mb-4">
+                        <label for="training_data_file" class="form-label">Training Data</label>
+                        <input type="file" class="form-control" id="training_data_file" name="training_data_file" 
+                               accept=".csv,.xls,.xlsx">
+                        <small class="text-muted">Upload training data file (CSV, XLS, or XLSX format) - Optional</small>
+                    </div>
+
                     <!-- Training Data Date Range -->
                     <div class="mb-4">
                         <label class="form-label">Training Data Period <span class="text-danger">*</span></label>
                         <div class="row">
                             <div class="col-md-6">
                                 <label for="training_data_start_date" class="form-label">Start Date</label>
-                                <input type="date" class="form-control" id="training_data_start_date" name="training_data_start_date" required>
-                                <small class="text-muted">Start date for training data</small>
+                                <input type="date" class="form-control" id="training_data_start_date" name="training_data_start_date" 
+                                       min="2023-01-01" max="2025-06-15" required>
                             </div>
                             <div class="col-md-6">
                                 <label for="training_data_end_date" class="form-label">End Date</label>
-                                <input type="date" class="form-control" id="training_data_end_date" name="training_data_end_date" required>
-                                <small class="text-muted">End date for training data</small>
+                                <input type="date" class="form-control" id="training_data_end_date" name="training_data_end_date" 
+                                       min="2023-01-01" max="2025-06-15" required>
                             </div>
                         </div>
                     </div>
@@ -54,72 +62,325 @@
                         
                         <!-- XGBoost Hyperparameters -->
                         <div id="xgbParams" style="display: none;">
+                            <!-- Booster & Tree Structure Parameters -->
+                            <h6 class="mt-3 mb-3 text-primary">Booster & Tree Structure Parameters</h6>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="xgb_max_depth" class="form-label">Max Depth</label>
-                                    <input type="number" class="form-control" id="xgb_max_depth" 
-                                           placeholder="e.g., 6" min="1" max="20" value="6">
-                                    <small class="text-muted">Maximum tree depth (1-20)</small>
+                                    <label for="xgb_booster" class="form-label">Booster</label>
+                                    <select class="form-select" id="xgb_booster">
+                                        <option value="gbtree" selected>gbtree</option>
+                                        <option value="dart">dart</option>
+                                        <option value="gblinear">gblinear</option>
+                                    </select>
+                                    <small class="text-muted">Type of booster to use</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label for="xgb_learning_rate" class="form-label">Learning Rate</label>
-                                    <input type="number" class="form-control" id="xgb_learning_rate" 
-                                           placeholder="e.g., 0.1" step="0.001" min="0.001" max="1" value="0.1">
-                                    <small class="text-muted">Step size shrinkage (0.001-1)</small>
+                                    <label for="xgb_tree_method" class="form-label">Tree Method</label>
+                                    <select class="form-select" id="xgb_tree_method">
+                                        <option value="auto" selected>auto</option>
+                                        <option value="exact">exact</option>
+                                        <option value="approx">approx</option>
+                                        <option value="hist">hist</option>
+                                        <option value="gpu_hist">gpu_hist</option>
+                                    </select>
+                                    <small class="text-muted">Tree construction algorithm</small>
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="xgb_n_estimators" class="form-label">N Estimators</label>
-                                    <input type="number" class="form-control" id="xgb_n_estimators" 
-                                           placeholder="e.g., 100" min="10" max="10000" value="100">
-                                    <small class="text-muted">Number of boosting rounds (10-10000)</small>
+                                    <label for="xgb_grow_policy" class="form-label">Grow Policy</label>
+                                    <select class="form-select" id="xgb_grow_policy">
+                                        <option value="depthwise" selected>depthwise</option>
+                                        <option value="lossguide">lossguide</option>
+                                    </select>
+                                    <small class="text-muted">Tree growth policy</small>
                                 </div>
                                 <div class="col-md-6 mb-3">
+                                    <label for="xgb_max_depth" class="form-label">Max Depth</label>
+                                    <input type="number" class="form-control" id="xgb_max_depth" value="6" min="3" max="10">
+                                    <small class="text-muted">Maximum tree depth (3-10)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_max_leaves" class="form-label">Max Leaves</label>
+                                    <input type="number" class="form-control" id="xgb_max_leaves" value="0" min="0" max="256">
+                                    <small class="text-muted">Max leaves (16-256, lossguide only, 0=disabled)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_max_bin" class="form-label">Max Bin</label>
+                                    <input type="number" class="form-control" id="xgb_max_bin" value="256" min="64" max="512">
+                                    <small class="text-muted">Max number of bins (64-512)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_min_child_weight" class="form-label">Min Child Weight</label>
+                                    <input type="number" class="form-control" id="xgb_min_child_weight" value="1" min="1" max="10">
+                                    <small class="text-muted">Minimum sum of instance weight (1-10)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_gamma" class="form-label">Gamma</label>
+                                    <input type="number" class="form-control" id="xgb_gamma" value="0" min="0" max="10" step="0.1">
+                                    <small class="text-muted">Minimum loss reduction (0-10)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_max_delta_step" class="form-label">Max Delta Step</label>
+                                    <input type="number" class="form-control" id="xgb_max_delta_step" value="0" min="0" max="10">
+                                    <small class="text-muted">Maximum delta step (0-10)</small>
+                                </div>
+                            </div>
+
+                            <!-- Learning / Optimization Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Learning / Optimization Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_learning_rate" class="form-label">Learning Rate</label>
+                                    <input type="number" class="form-control" id="xgb_learning_rate" value="0.1" min="0.01" max="0.3" step="0.01">
+                                    <small class="text-muted">Step size shrinkage (0.01-0.3)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_n_estimators" class="form-label">N Estimators</label>
+                                    <input type="number" class="form-control" id="xgb_n_estimators" value="100" min="100" max="2000">
+                                    <small class="text-muted">Number of boosting rounds (100-2000)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
                                     <label for="xgb_early_stopping_rounds" class="form-label">Early Stopping Rounds</label>
-                                    <input type="number" class="form-control" id="xgb_early_stopping_rounds" 
-                                           placeholder="e.g., 10" min="1" max="100" value="10">
-                                    <small class="text-muted">Stop if no improvement (1-100)</small>
+                                    <input type="number" class="form-control" id="xgb_early_stopping_rounds" value="10" min="10" max="100">
+                                    <small class="text-muted">Stop if no improvement (10-100)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_sampling_method" class="form-label">Sampling Method</label>
+                                    <select class="form-select" id="xgb_sampling_method">
+                                        <option value="uniform" selected>uniform</option>
+                                        <option value="gradient_based">gradient_based</option>
+                                    </select>
+                                    <small class="text-muted">Sampling method for training</small>
+                                </div>
+                            </div>
+
+                            <!-- Sampling Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Sampling Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_subsample" class="form-label">Subsample</label>
+                                    <input type="number" class="form-control" id="xgb_subsample" value="1.0" min="0.5" max="1.0" step="0.1">
+                                    <small class="text-muted">Subsample ratio (0.5-1.0)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_colsample_bytree" class="form-label">Colsample By Tree</label>
+                                    <input type="number" class="form-control" id="xgb_colsample_bytree" value="1.0" min="0.3" max="1.0" step="0.1">
+                                    <small class="text-muted">Column sampling per tree (0.3-1.0)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_colsample_bylevel" class="form-label">Colsample By Level</label>
+                                    <input type="number" class="form-control" id="xgb_colsample_bylevel" value="1.0" min="0.3" max="1.0" step="0.1">
+                                    <small class="text-muted">Column sampling per level (0.3-1.0)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_colsample_bynode" class="form-label">Colsample By Node</label>
+                                    <input type="number" class="form-control" id="xgb_colsample_bynode" value="1.0" min="0.3" max="1.0" step="0.1">
+                                    <small class="text-muted">Column sampling per node (0.3-1.0)</small>
+                                </div>
+                            </div>
+
+                            <!-- Regularization Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Regularization Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_reg_alpha" class="form-label">Reg Alpha (L1)</label>
+                                    <input type="number" class="form-control" id="xgb_reg_alpha" value="0" min="0" max="10" step="0.1">
+                                    <small class="text-muted">L1 regularization (0-10)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_reg_lambda" class="form-label">Reg Lambda (L2)</label>
+                                    <input type="number" class="form-control" id="xgb_reg_lambda" value="1" min="0.1" max="10" step="0.1">
+                                    <small class="text-muted">L2 regularization (0.1-10)</small>
+                                </div>
+                            </div>
+
+                            <!-- Randomness & Determinism -->
+                            <h6 class="mt-4 mb-3 text-primary">Randomness & Determinism</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="xgb_random_state" class="form-label">Random State</label>
+                                    <input type="number" class="form-control" id="xgb_random_state" value="42">
+                                    <small class="text-muted">Random seed for reproducibility</small>
                                 </div>
                             </div>
                         </div>
 
                         <!-- LightGBM Hyperparameters -->
                         <div id="lgbParams" style="display: none;">
+                            <!-- Core Booster / Tree Structure Parameters -->
+                            <h6 class="mt-3 mb-3 text-primary">Core Booster / Tree Structure Parameters</h6>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="lgb_n_estimators" class="form-label">N Estimators</label>
-                                    <input type="number" class="form-control" id="lgb_n_estimators" 
-                                           placeholder="e.g., 100" min="10" max="10000" value="100">
-                                    <small class="text-muted">Number of boosting rounds (10-10000)</small>
+                                    <label for="lgb_boosting_type" class="form-label">Boosting Type</label>
+                                    <select class="form-select" id="lgb_boosting_type">
+                                        <option value="gbdt" selected>gbdt</option>
+                                        <option value="dart">dart</option>
+                                        <option value="goss">goss</option>
+                                    </select>
+                                    <small class="text-muted">Type of boosting algorithm</small>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="lgb_learning_rate" class="form-label">Learning Rate</label>
-                                    <input type="number" class="form-control" id="lgb_learning_rate" 
-                                           placeholder="e.g., 0.1" step="0.001" min="0.001" max="1" value="0.1">
-                                    <small class="text-muted">Step size shrinkage (0.001-1)</small>
-                                </div>
-                            </div>
-                            <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="lgb_num_leaves" class="form-label">Num Leaves</label>
-                                    <input type="number" class="form-control" id="lgb_num_leaves" 
-                                           placeholder="e.g., 31" min="2" max="1000" value="31">
-                                    <small class="text-muted">Maximum tree leaves (2-1000)</small>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="lgb_max_depth" class="form-label">Max Depth</label>
-                                    <input type="number" class="form-control" id="lgb_max_depth" 
-                                           placeholder="e.g., -1" value="-1">
-                                    <small class="text-muted">Maximum tree depth (-1 for no limit)</small>
+                                    <input type="number" class="form-control" id="lgb_num_leaves" value="31" min="31" max="255">
+                                    <small class="text-muted">Maximum tree leaves (31-255)</small>
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
+                                    <label for="lgb_max_depth" class="form-label">Max Depth</label>
+                                    <input type="number" class="form-control" id="lgb_max_depth" value="-1">
+                                    <small class="text-muted">Maximum tree depth (-1 for no limit, or 3-12)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_min_data_in_leaf" class="form-label">Min Data In Leaf</label>
+                                    <input type="number" class="form-control" id="lgb_min_data_in_leaf" value="20" min="10" max="100">
+                                    <small class="text-muted">Minimum data in one leaf (10-100)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_min_sum_hessian_in_leaf" class="form-label">Min Sum Hessian In Leaf</label>
+                                    <input type="number" class="form-control" id="lgb_min_sum_hessian_in_leaf" value="0.001" min="0.001" max="10" step="0.001">
+                                    <small class="text-muted">Minimum sum of hessian (0.001-10)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
                                     <label for="lgb_max_bin" class="form-label">Max Bin</label>
-                                    <input type="number" class="form-control" id="lgb_max_bin" 
-                                           placeholder="e.g., 255" min="2" max="1000" value="255">
-                                    <small class="text-muted">Max number of bins (2-1000)</small>
+                                    <input type="number" class="form-control" id="lgb_max_bin" value="255" min="63" max="511">
+                                    <small class="text-muted">Max number of bins (63-511)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_min_split_gain" class="form-label">Min Split Gain</label>
+                                    <input type="number" class="form-control" id="lgb_min_split_gain" value="0" min="0" max="10" step="0.1">
+                                    <small class="text-muted">Minimum gain to split (0-10)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_path_smooth" class="form-label">Path Smooth</label>
+                                    <input type="number" class="form-control" id="lgb_path_smooth" value="0" min="0" max="1" step="0.1">
+                                    <small class="text-muted">Path smoothing (0-1)</small>
+                                </div>
+                            </div>
+
+                            <!-- Learning / Optimization Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Learning / Optimization Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_learning_rate" class="form-label">Learning Rate</label>
+                                    <input type="number" class="form-control" id="lgb_learning_rate" value="0.1" min="0.005" max="0.3" step="0.005">
+                                    <small class="text-muted">Learning rate (0.005-0.3)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_num_iterations" class="form-label">Num Iterations</label>
+                                    <input type="number" class="form-control" id="lgb_num_iterations" value="100" min="100" max="5000">
+                                    <small class="text-muted">Number of iterations (100-5000)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_early_stopping_rounds" class="form-label">Early Stopping Rounds</label>
+                                    <input type="number" class="form-control" id="lgb_early_stopping_rounds" value="10" min="10" max="200">
+                                    <small class="text-muted">Early stopping rounds (10-200)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_bagging_freq" class="form-label">Bagging Freq</label>
+                                    <input type="number" class="form-control" id="lgb_bagging_freq" value="0" min="0" max="10">
+                                    <small class="text-muted">Bagging frequency (0-10)</small>
+                                </div>
+                            </div>
+
+                            <!-- Sampling Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Sampling Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_bagging_fraction" class="form-label">Bagging Fraction</label>
+                                    <input type="number" class="form-control" id="lgb_bagging_fraction" value="1.0" min="0.5" max="1.0" step="0.1">
+                                    <small class="text-muted">Bagging fraction (0.5-1.0)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_feature_fraction" class="form-label">Feature Fraction</label>
+                                    <input type="number" class="form-control" id="lgb_feature_fraction" value="1.0" min="0.3" max="1.0" step="0.1">
+                                    <small class="text-muted">Feature fraction (0.3-1.0)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_feature_fraction_bynode" class="form-label">Feature Fraction By Node</label>
+                                    <input type="number" class="form-control" id="lgb_feature_fraction_bynode" value="1.0" min="0.3" max="1.0" step="0.1">
+                                    <small class="text-muted">Feature fraction per node (0.3-1.0)</small>
+                                </div>
+                            </div>
+
+                            <!-- Regularization Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">Regularization Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_lambda_l1" class="form-label">Lambda L1</label>
+                                    <input type="number" class="form-control" id="lgb_lambda_l1" value="0" min="0" max="10" step="0.1">
+                                    <small class="text-muted">L1 regularization (0-10)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_lambda_l2" class="form-label">Lambda L2</label>
+                                    <input type="number" class="form-control" id="lgb_lambda_l2" value="0" min="0" max="10" step="0.1">
+                                    <small class="text-muted">L2 regularization (0-10)</small>
+                                </div>
+                            </div>
+
+                            <!-- DART-Specific Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">DART-Specific Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_drop_rate" class="form-label">Drop Rate</label>
+                                    <input type="number" class="form-control" id="lgb_drop_rate" value="0.1" min="0.1" max="0.5" step="0.1">
+                                    <small class="text-muted">Drop rate for DART (0.1-0.5)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_skip_drop" class="form-label">Skip Drop</label>
+                                    <input type="number" class="form-control" id="lgb_skip_drop" value="0.5" min="0" max="0.5" step="0.1">
+                                    <small class="text-muted">Skip drop probability (0-0.5)</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_max_drop" class="form-label">Max Drop</label>
+                                    <input type="number" class="form-control" id="lgb_max_drop" value="50" min="10" max="100">
+                                    <small class="text-muted">Max number of dropped trees (10-100)</small>
+                                </div>
+                            </div>
+
+                            <!-- GOSS-Specific Parameters -->
+                            <h6 class="mt-4 mb-3 text-primary">GOSS-Specific Parameters</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_top_rate" class="form-label">Top Rate</label>
+                                    <input type="number" class="form-control" id="lgb_top_rate" value="0.2" min="0.1" max="0.5" step="0.1">
+                                    <small class="text-muted">Top rate for GOSS (0.1-0.5)</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_other_rate" class="form-label">Other Rate</label>
+                                    <input type="number" class="form-control" id="lgb_other_rate" value="0.1" min="0.1" max="0.5" step="0.1">
+                                    <small class="text-muted">Other rate for GOSS (0.1-0.5)</small>
+                                </div>
+                            </div>
+
+                            <!-- Randomness & Determinism -->
+                            <h6 class="mt-4 mb-3 text-primary">Randomness & Determinism</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="lgb_seed" class="form-label">Seed</label>
+                                    <input type="number" class="form-control" id="lgb_seed" value="42">
+                                    <small class="text-muted">Random seed for reproducibility</small>
                                 </div>
                             </div>
                         </div>
@@ -201,18 +462,64 @@ $(document).ready(function() {
         
         if (model === 'xgb') {
             hyperparams = {
+                // Booster & Tree Structure Parameters
+                booster: $('#xgb_booster').val(),
+                tree_method: $('#xgb_tree_method').val(),
+                grow_policy: $('#xgb_grow_policy').val(),
                 max_depth: parseInt($('#xgb_max_depth').val()),
+                max_leaves: parseInt($('#xgb_max_leaves').val()),
+                max_bin: parseInt($('#xgb_max_bin').val()),
+                min_child_weight: parseInt($('#xgb_min_child_weight').val()),
+                gamma: parseFloat($('#xgb_gamma').val()),
+                max_delta_step: parseInt($('#xgb_max_delta_step').val()),
+                // Learning / Optimization Parameters
                 learning_rate: parseFloat($('#xgb_learning_rate').val()),
                 n_estimators: parseInt($('#xgb_n_estimators').val()),
-                early_stopping_rounds: parseInt($('#xgb_early_stopping_rounds').val())
+                early_stopping_rounds: parseInt($('#xgb_early_stopping_rounds').val()),
+                sampling_method: $('#xgb_sampling_method').val(),
+                // Sampling Parameters
+                subsample: parseFloat($('#xgb_subsample').val()),
+                colsample_bytree: parseFloat($('#xgb_colsample_bytree').val()),
+                colsample_bylevel: parseFloat($('#xgb_colsample_bylevel').val()),
+                colsample_bynode: parseFloat($('#xgb_colsample_bynode').val()),
+                // Regularization Parameters
+                reg_alpha: parseFloat($('#xgb_reg_alpha').val()),
+                reg_lambda: parseFloat($('#xgb_reg_lambda').val()),
+                // Randomness & Determinism
+                random_state: parseInt($('#xgb_random_state').val())
             };
         } else if (model === 'lgb') {
             hyperparams = {
-                n_estimators: parseInt($('#lgb_n_estimators').val()),
-                learning_rate: parseFloat($('#lgb_learning_rate').val()),
+                // Core Booster / Tree Structure Parameters
+                boosting_type: $('#lgb_boosting_type').val(),
                 num_leaves: parseInt($('#lgb_num_leaves').val()),
                 max_depth: parseInt($('#lgb_max_depth').val()),
-                max_bin: parseInt($('#lgb_max_bin').val())
+                min_data_in_leaf: parseInt($('#lgb_min_data_in_leaf').val()),
+                min_sum_hessian_in_leaf: parseFloat($('#lgb_min_sum_hessian_in_leaf').val()),
+                max_bin: parseInt($('#lgb_max_bin').val()),
+                min_split_gain: parseFloat($('#lgb_min_split_gain').val()),
+                path_smooth: parseFloat($('#lgb_path_smooth').val()),
+                // Learning / Optimization Parameters
+                learning_rate: parseFloat($('#lgb_learning_rate').val()),
+                num_iterations: parseInt($('#lgb_num_iterations').val()),
+                early_stopping_rounds: parseInt($('#lgb_early_stopping_rounds').val()),
+                bagging_freq: parseInt($('#lgb_bagging_freq').val()),
+                // Sampling Parameters
+                bagging_fraction: parseFloat($('#lgb_bagging_fraction').val()),
+                feature_fraction: parseFloat($('#lgb_feature_fraction').val()),
+                feature_fraction_bynode: parseFloat($('#lgb_feature_fraction_bynode').val()),
+                // Regularization Parameters
+                lambda_l1: parseFloat($('#lgb_lambda_l1').val()),
+                lambda_l2: parseFloat($('#lgb_lambda_l2').val()),
+                // DART-Specific Parameters
+                drop_rate: parseFloat($('#lgb_drop_rate').val()),
+                skip_drop: parseFloat($('#lgb_skip_drop').val()),
+                max_drop: parseInt($('#lgb_max_drop').val()),
+                // GOSS-Specific Parameters
+                top_rate: parseFloat($('#lgb_top_rate').val()),
+                other_rate: parseFloat($('#lgb_other_rate').val()),
+                // Randomness & Determinism
+                seed: parseInt($('#lgb_seed').val())
             };
         }
         
@@ -229,6 +536,12 @@ $(document).ready(function() {
         formData.append('training_data_end_date', training_data_end_date);
         formData.append('hyperparams', JSON.stringify(hyperparams));
         
+        // Add file if selected
+        const fileInput = document.getElementById('training_data_file');
+        if (fileInput.files.length > 0) {
+            formData.append('training_data_file', fileInput.files[0]);
+        }
+        
         // Submit to API
         fetch('/api/train', {
             method: 'POST',
@@ -236,11 +549,14 @@ $(document).ready(function() {
         })
         .then(response => response.json())
         .then(data => {
-            // Show success message
-            showAlert('Training initiated successfully!', 'success');
-            
             // Display training status
             displayTrainingStatus(data);
+            
+            // Reset the form
+            $('#trainForm')[0].reset();
+            $('#hyperparamsSection').hide();
+            $('#xgbParams').hide();
+            $('#lgbParams').hide();
             
             // Re-enable submit button
             $trainBtn.prop('disabled', false);
@@ -273,7 +589,9 @@ $(document).ready(function() {
 
     function displayTrainingStatus(data) {
         const modelName = data.model === 'xgb' ? 'XGBoost' : 'LightGBM';
-        const custom_name = data.custom_name
+        const custom_name = data.custom_name;
+        const startDate = data.training_data_start_date;
+        const endDate = data.training_data_end_date;
         
         let paramsHtml = '<ul class="list-unstyled mb-0">';
         for (const [key, value] of Object.entries(data.hyperparameters)) {
@@ -294,8 +612,20 @@ $(document).ready(function() {
                 <div class="col-md-6">
                     <h6 class="text-muted mb-2">Status</h6>
                     <p class="h5 mb-3">
-                        <span class="badge bg-success">In Progress</span>
+                        <span class="badge bg-success">Successful</span>
                     </p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Message</h6>
+                    <p class="h5 mb-3">${data.message}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Training Start Date</h6>
+                    <p class="h5 mb-3">${startDate}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Training End Date</h6>
+                    <p class="h5 mb-3">${endDate}</p>
                 </div>
             </div>
             <hr>

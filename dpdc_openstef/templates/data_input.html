@@ -26,6 +26,29 @@
                     </div>
                 </div>
 
+                <!-- Holiday, Holiday Type, and National Event Row -->
+                <div class="row mb-4" id="dropdownsSection" style="display: none;">
+                    <div class="col-md-4">
+                        <label for="holiday" class="form-label">Holiday <span class="text-danger">*</span></label>
+                        <select class="form-select" id="holiday" name="holiday" required>
+                            <option value="0" selected>0 (No)</option>
+                            <option value="1">1 (Yes)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="holiday_type" class="form-label">Holiday Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="holiday_type" name="holiday_type" required>
+                            <option value="0" selected>0</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="nation_event" class="form-label">National Event <span class="text-danger">*</span></label>
+                        <select class="form-select" id="nation_event" name="nation_event" required>
+                            <option value="0" selected>0</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Alert Messages -->
                 <div id="alertContainer"></div>
 
@@ -87,6 +110,9 @@ $(document).ready(function() {
     currentDate = new Date().toISOString().split('T')[0];
     $('#dateSelector').val(currentDate);
 
+    // Initialize common dropdowns using shared utility
+    initializeCommonDropdowns();
+
     // Load Data Button
     $('#loadDataBtn').on('click', function() {
         if (!currentDate) {
@@ -103,6 +129,7 @@ $(document).ready(function() {
             .then(data => {
                 hourlyData = data.data;
                 displayDataTable(data.data);
+                $('#dropdownsSection').slideDown();
                 $('#dataTableSection').slideDown();
                 
                 $btn.prop('disabled', false);
@@ -140,6 +167,9 @@ $(document).ready(function() {
         const formData = new FormData();
         formData.append('date', currentDate);
         formData.append('hourly_data', JSON.stringify(updatedData));
+        formData.append('holiday', $('#holiday').val());
+        formData.append('holiday_type', $('#holiday_type').val());
+        formData.append('nation_event', $('#nation_event').val());
 
         fetch('/api/data-input', {
             method: 'POST',

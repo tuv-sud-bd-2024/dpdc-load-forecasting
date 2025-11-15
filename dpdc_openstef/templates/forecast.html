@@ -155,19 +155,8 @@ $(document).ready(function() {
         placeholder: 'Select hour...'
     });
 
-    // Populate holiday_type select
-    const holidayTypeOptions = [];
-    for (let i = 0; i <= 20; i++) {
-        holidayTypeOptions.push(`<option value="${i}" ${i === 0 ? 'selected' : ''}>${i}</option>`);
-    }
-    $('#holiday_type').html(holidayTypeOptions.join(''));
-
-    // Populate nation_event select
-    const nationEventOptions = [];
-    for (let i = 0; i <= 5; i++) {
-        nationEventOptions.push(`<option value="${i}" ${i === 0 ? 'selected' : ''}>${i}</option>`);
-    }
-    $('#nation_event').html(nationEventOptions.join(''));
+    // Initialize common dropdowns using shared utility
+    initializeCommonDropdowns();
 
     // Fetch Weather Data
     $('#fetchWeatherBtn').on('click', function() {

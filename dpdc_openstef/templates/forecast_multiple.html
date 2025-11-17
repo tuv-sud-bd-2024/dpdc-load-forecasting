@@ -270,7 +270,8 @@ $(document).ready(function() {
 
         // Build table body - one row per hour (0-23)
         let bodyHtml = '';
-        const numHours = allForecasts[0].model_forecasts.length;
+        // Safely get the number of hours, defaulting to 24
+        const numHours = allForecasts[0]?.model_forecasts?.length || 24;
         
         for (let hourIdx = 0; hourIdx < numHours; hourIdx++) {
             bodyHtml += `<tr><td class="text-center"><strong>${hourIdx}</strong></td>`;
@@ -284,11 +285,20 @@ $(document).ready(function() {
             
             // Add forecast value and deviation for each model
             allForecasts.forEach(modelData => {
-                const forecastValue = modelData.model_forecasts[hourIdx].forecast;
-                bodyHtml += `<td class="text-center">${forecastValue.toFixed(2)}</td>`;
+                // Safely access forecast value with null checks
+                const forecastData = modelData.model_forecasts?.[hourIdx];
+                const forecastValue = forecastData?.forecast;
+                
+                // Display forecast value or N/A if missing
+                if (forecastValue !== null && forecastValue !== undefined) {
+                    bodyHtml += `<td class="text-center">${forecastValue.toFixed(2)}</td>`;
+                } else {
+                    bodyHtml += `<td class="text-center text-muted">N/A</td>`;
+                }
                 
                 // Calculate deviation percentage
-                if (hasActualLoads && actualLoad !== null && actualLoad !== undefined && actualLoad !== 0) {
+                if (hasActualLoads && actualLoad !== null && actualLoad !== undefined && actualLoad !== 0 
+                    && forecastValue !== null && forecastValue !== undefined) {
                     const deviation = ((forecastValue - actualLoad) / actualLoad) * 100;
                     const sign = deviation >= 0 ? '+' : '';
                     bodyHtml += `<td class="text-center">${sign}${deviation.toFixed(2)}%</td>`;
@@ -356,7 +366,8 @@ $(document).ready(function() {
         ];
         
         allForecasts.forEach((modelData, idx) => {
-            const forecastValues = modelData.model_forecasts.map(f => f.forecast);
+            // Safely map forecast values, handling missing data
+            const forecastValues = modelData.model_forecasts?.map(f => f?.forecast ?? null) || [];
             const color = colors[idx % colors.length];
             
             traces.push({

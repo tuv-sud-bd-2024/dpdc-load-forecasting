@@ -320,13 +320,11 @@ class ModelService:
         # Calculate the start of the 24-hour forecast period (hour 0 of the given date)
         forecast_start_datetime = create_utc_datetime(date, 0)
         
-        # Get the index of the hour before the forecast period starts
-        traing_data_last_index = input_data.index.get_loc(calculate_previous_hr_of_forecast(date, 0))
+        # Get the index of the hour before the forecast period starts (robust to missing timestamps)
+        traing_data_last_index = get_training_data_last_index(input_data, date)
         
-        # Get the 24 hours we want to forecast (from hour 0 to hour 23 of the given date)
-        test_data = input_data.iloc[traing_data_last_index+1:traing_data_last_index+25]
-        logger.info(f"Test data starting hour: {test_data.head(1).index}")
-        logger.info(f"Test data ending hour: {test_data.tail(1).index}")
+        # Get the test data for the forecast date (only available timestamps)
+        test_data = get_test_data_for_date(input_data, date)
         
         # Prepare data to make the forecast - set load values to NaN for the 24 hours
         to_forecast_data = input_data.copy(deep=True)
@@ -366,11 +364,27 @@ class ModelService:
             model_forecasts = []
             for hour in range(24):
                 forecast_timestamp = create_utc_datetime(date, hour)
-                forecast_value = forecast_df.loc[forecast_timestamp, 'forecast']
+                
+                # Safely access forecast value with error handling
+                try:
+                    if forecast_timestamp in forecast_df.index and 'forecast' in forecast_df.columns:
+                        forecast_value = forecast_df.loc[forecast_timestamp, 'forecast']
+                        # Check if the value is valid (not NaN)
+                        if pd.notna(forecast_value):
+                            forecast_value = float(forecast_value)
+                        else:
+                            forecast_value = None
+                            logger.warning(f"Forecast value is NaN for {custom_name} at {forecast_timestamp}")
+                    else:
+                        forecast_value = None
+                        logger.warning(f"Forecast timestamp {forecast_timestamp} not found in forecast_df for {custom_name}")
+                except Exception as e:
+                    forecast_value = None
+                    logger.error(f"Error accessing forecast value for {custom_name} at {forecast_timestamp}: {e}")
                 
                 forecast_result = {
                     "timestamp": create_utc_datetime(date, hour, timezone(timedelta(hours=6))).isoformat(),
-                    "forecast": float(forecast_value)
+                    "forecast": forecast_value
                 }
                 model_forecasts.append(forecast_result)
             
@@ -432,4 +446,96 @@ def calculate_previous_hr_of_forecast(date: str, hour: int) -> datetime:
         adjusted_hour = 23
     
     return create_utc_datetime(adjusted_date, adjusted_hour)
+
+
+def get_training_data_last_index(input_data: pd.DataFrame, date: str) -> int:
+    """
+    Robustly find the index position of the last training data point before forecast period.
+    
+    Uses searchsorted to handle cases where the exact timestamp doesn't exist in the data.
+    
+    Args:
+        input_data: DataFrame with datetime index containing training data
+        date: Forecast date in 'YYYY-MM-DD' format
+        
+    Returns:
+        Integer index position of the last training data point
+        
+    Raises:
+        ValueError: If forecast date is before available training data
+    """
+    previous_hour = calculate_previous_hr_of_forecast(date, 0)
+    
+    # Check if the exact timestamp exists
+    if previous_hour in input_data.index:
+        training_data_last_index = input_data.index.get_loc(previous_hour)
+        logger.info(f"Found training data ending at: {previous_hour}")
+        return training_data_last_index
+    
+    # Exact timestamp not found - use searchsorted to find closest position
+    insert_pos = input_data.index.searchsorted(previous_hour)
+    
+    if insert_pos == 0:
+        # Requested date is before all available data
+        logger.error(f"Forecast date {date} is before available training data")
+        raise ValueError(
+            f"No training data available before {date}. "
+            f"Earliest available data: {input_data.index.min().strftime('%Y-%m-%d')}. "
+            f"Please select a later date."
+        )
+    elif insert_pos >= len(input_data):
+        # Requested date is after all available data - use last available index
+        logger.warning(f"Previous hour {previous_hour} is after all data. Using last available timestamp.")
+        training_data_last_index = len(input_data) - 1
+    else:
+        # Use the index just before the insertion point
+        training_data_last_index = insert_pos - 1
+        actual_timestamp = input_data.index[training_data_last_index]
+        logger.warning(
+            f"Previous hour {previous_hour} not found in data. "
+            f"Using closest earlier timestamp: {actual_timestamp}"
+        )
+    
+    return training_data_last_index
+
+
+def get_test_data_for_date(input_data: pd.DataFrame, date: str) -> pd.DataFrame:
+    """
+    Extract test data for a specific forecast date, handling missing timestamps gracefully.
+    
+    Instead of assuming 24 consecutive hours exist, this filters by date range to get
+    only the timestamps that actually exist in the data.
+    
+    Args:
+        input_data: DataFrame with datetime index containing all data
+        date: Forecast date in 'YYYY-MM-DD' format
+        
+    Returns:
+        DataFrame containing only the available timestamps for the forecast date
+    """
+    # Define the 24-hour forecast period
+    forecast_start = create_utc_datetime(date, 0)
+    forecast_end = create_utc_datetime(date, 23)
+    
+    # Filter to get only timestamps within the forecast period that exist in the data
+    test_data = input_data[(input_data.index >= forecast_start) & (input_data.index <= forecast_end)]
+    
+    # Log information about data availability
+    logger.info(f"Test data contains {len(test_data)} hours out of 24 possible for date {date}")
+    
+    if len(test_data) > 0:
+        logger.info(f"Test data starting hour: {test_data.head(1).index[0]}")
+        logger.info(f"Test data ending hour: {test_data.tail(1).index[0]}")
+        
+        # Log any missing hours for debugging
+        expected_hours = set(range(24))
+        available_hours = set(test_data.index.hour)
+        missing_hours = expected_hours - available_hours
+        
+        if missing_hours:
+            logger.warning(f"Missing hours in test data: {sorted(missing_hours)}")
+    else:
+        logger.warning(f"No data found for forecast date {date}")
+    
+    return test_data
 

@@ -329,6 +329,11 @@ class ModelService:
         # Prepare data to make the forecast - set load values to NaN for the 24 hours
         to_forecast_data = input_data.copy(deep=True)
         to_forecast_data.loc[test_data.index, 'load'] = np.nan
+        # Drop all data points after the last test_data timestamp
+        if len(test_data) > 0:
+            last_test_timestamp = test_data.index[-1]
+            to_forecast_data = to_forecast_data[to_forecast_data.index <= last_test_timestamp]
+            logger.info(f"Dropped data points after {last_test_timestamp}")
         
         # Remove duplicate index values and NaT
         to_forecast_data = to_forecast_data[~to_forecast_data.index.duplicated(keep='first')]

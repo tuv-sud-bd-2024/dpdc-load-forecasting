@@ -13,6 +13,7 @@ from openstef.pipeline.train_model import train_model_pipeline
 from openstef.pipeline.create_forecast import create_forecast_pipeline
 from utils.dateutils import create_utc_datetime
 from datetime import datetime, timedelta, timezone
+from services.weather_service import get_weather_for_date
 
 # Get logger for this module (configuration is done in main.py)
 logger = logging.getLogger(__name__)
@@ -406,6 +407,280 @@ class ModelService:
             "all_forecasts": all_forecasts,
             "actual_loads": actual_loads
         }
+    
+    @staticmethod
+    async def generate_realtime_forecast(
+        custom_names: List[str], 
+        date: str, 
+        holiday: int = 0, 
+        holiday_type: int = 0, 
+        nation_event: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Generate real-time forecasts from current Dhaka hour to end of day (hour 23)
+        
+        This method:
+        1. Determines current hour in Dhaka timezone
+        2. Validates that the selected date is TODAY's date in Dhaka timezone
+        3. Extracts historical actual load (hour 0 to current_hour - 1) from CSV
+        4. Extracts historical forecasted load (hour 0 to current_hour - 1) from CSV
+        5. Creates missing future timestamps with weather data from Meteostat
+        6. Generates forecasts for remaining hours (current_hour to 23) using selected models
+        
+        Args:
+            custom_names: List of trained model names
+            date: Date string in format 'YYYY-MM-DD' (must be today's date in Dhaka timezone)
+            holiday: Holiday indicator (0 or 1)
+            holiday_type: Type of holiday (default 0)
+            nation_event: National event indicator (default 0)
+            
+        Returns:
+            Dict with structure:
+            {
+                "current_hour": int,
+                "historical_actual": [{"hour": int, "load": float}],
+                "historical_forecasted": [{"hour": int, "load": float}],
+                "model_forecasts": [
+                    {
+                        "custom_name": str,
+                        "forecasts": [{"hour": int, "forecast": float}]
+                    }
+                ]
+            }
+            
+        Raises:
+            ValueError: If date is not today's date in Dhaka timezone
+        """
+        # Get current Dhaka date and hour
+        dhaka_tz = timezone(timedelta(hours=6))
+        current_dhaka_datetime = datetime.now(dhaka_tz)
+        current_dhaka_date = current_dhaka_datetime.strftime('%Y-%m-%d')
+        current_hour = current_dhaka_datetime.hour
+        
+        logger.info(f"Current Dhaka time: {current_dhaka_datetime}, Date: {current_dhaka_date}, Hour: {current_hour}")
+        
+        # Validate that the selected date is today's date in Dhaka timezone
+        if date != current_dhaka_date:
+            error_msg = (
+                f"Real-time forecasting only works for the current date. "
+                f"Selected date: {date}, Current Dhaka date: {current_dhaka_date}. "
+                f"Please select today's date or use the 'Backtest Models' feature for historical dates."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Check if it's too late in the day (hour 23)
+        if current_hour == 23:
+            logger.warning("Current hour is 23. Only one hour remaining to forecast.")
+        
+        # Validate that models list is not empty
+        if not custom_names:
+            error_msg = "At least one model must be selected for forecasting."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Load input data with error handling
+        try:
+            input_data = pd.read_csv(TRAINING_DATA_PATH, index_col=0, parse_dates=True)
+        except FileNotFoundError:
+            error_msg = f"Training data file not found: {TRAINING_DATA_PATH}"
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        except Exception as e:
+            error_msg = f"Error loading training data: {e}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        
+        # Extract historical actual load (hour 0 to current_hour - 1)
+        historical_actual = []
+        for hour in range(0, current_hour):
+            timestamp = create_utc_datetime(date, hour)
+            if timestamp in input_data.index:
+                load = input_data.loc[timestamp, 'load']
+                if pd.notna(load):
+                    historical_actual.append({
+                        "hour": hour,
+                        "load": float(load)
+                    })
+        
+        logger.info(f"Extracted {len(historical_actual)} historical actual load values (hours 0-{current_hour-1})")
+        
+        # Extract historical forecasted load (hour 0 to current_hour - 1)
+        historical_forecasted = []
+        if 'forecasted_load' in input_data.columns:
+            for hour in range(0, current_hour):
+                timestamp = create_utc_datetime(date, hour)
+                if timestamp in input_data.index:
+                    forecasted_load = input_data.loc[timestamp, 'forecasted_load']
+                    if pd.notna(forecasted_load):
+                        historical_forecasted.append({
+                            "hour": hour,
+                            "load": float(forecasted_load)
+                        })
+        
+        logger.info(f"Extracted {len(historical_forecasted)} historical forecasted load values (hours 0-{current_hour-1})")
+        
+        # Prepare data for forecasting (current_hour to 23)
+        # Get only the timestamps that exist in the data for the forecast period
+        forecast_start = create_utc_datetime(date, current_hour)
+        forecast_end = create_utc_datetime(date, 23)
+        
+        # Filter to get only timestamps within the forecast period that exist in the data
+        test_data = input_data[(input_data.index >= forecast_start) & (input_data.index <= forecast_end)]
+        
+        logger.info(f"Test data contains {len(test_data)} hours from hour {current_hour} to 23 for date {date}")
+        
+        # Check if we need to create missing timestamps
+        expected_hours = list(range(current_hour, 24))
+        existing_hours = [ts.hour for ts in test_data.index]
+        missing_hours = [h for h in expected_hours if h not in existing_hours]
+        
+        if missing_hours:
+            logger.info(f"Missing {len(missing_hours)} hours in forecast period: {missing_hours}")
+            logger.info(f"Creating missing rows and fetching weather data from Meteostat...")
+            
+            # Fetch weather data for the entire day
+            try:
+                # Convert date string to datetime for weather service
+                date_obj = datetime.strptime(date, '%Y-%m-%d')
+                weather_data = get_weather_for_date(date_obj)
+                logger.info(f"Successfully fetched weather data for {len(weather_data)} hours")
+            except Exception as e:
+                logger.error(f"Error fetching weather data: {e}")
+                # Use default weather values if fetch fails
+                weather_data = [{'temp': 0.0, 'dwpt': 0.0, 'rhum': 0.0, 'prcp': 0.0, 
+                               'wdir': 0.0, 'wspd': 0.0, 'pres': 0.0, 'coco': 0} for _ in range(24)]
+            
+            # Create new rows for missing hours
+            new_rows = []
+            for hour in missing_hours:
+                timestamp = create_utc_datetime(date, hour)
+                weather = weather_data[hour] if hour < len(weather_data) else weather_data[0]
+                
+                # Create a new row with weather data and NaN for load
+                new_row = {
+                    'load': np.nan,
+                    'is_holiday': holiday,
+                    'holiday_type': holiday_type,
+                    'national_event_type': nation_event,
+                    'temp': weather.get('temp', 0.0),
+                    'dwpt': weather.get('dwpt', 0.0),
+                    'rhum': weather.get('rhum', 0.0),
+                    'prcp': weather.get('prcp', 0.0),
+                    'wdir': weather.get('wdir', 0.0),
+                    'wspd': weather.get('wspd', 0.0),
+                    'pres': weather.get('pres', 0.0),
+                    'coco': weather.get('coco', 0),
+                    'forecasted_load': np.nan
+                }
+                
+                # Create a DataFrame with the timestamp as index
+                new_row_df = pd.DataFrame([new_row], index=[timestamp])
+                new_rows.append(new_row_df)
+            
+            # Concatenate new rows with input_data
+            if new_rows:
+                input_data = pd.concat([input_data] + new_rows)
+                input_data = input_data.sort_index()  # Sort by timestamp
+                logger.info(f"Added {len(new_rows)} new rows to input_data")
+                
+                # Re-filter to get updated test_data
+                test_data = input_data[(input_data.index >= forecast_start) & (input_data.index <= forecast_end)]
+                logger.info(f"Updated test data now contains {len(test_data)} hours")
+        
+        if len(test_data) > 0:
+            logger.info(f"Forecast period starting hour: {test_data.head(1).index[0]}")
+            logger.info(f"Forecast period ending hour: {test_data.tail(1).index[0]}")
+        
+        # Prepare data to make the forecast - set load values to NaN for the forecast period
+        to_forecast_data = input_data.copy(deep=True)
+        to_forecast_data.loc[test_data.index, 'load'] = np.nan
+        
+        # Drop all data points after the last test_data timestamp
+        if len(test_data) > 0:
+            last_test_timestamp = test_data.index[-1]
+            to_forecast_data = to_forecast_data[to_forecast_data.index <= last_test_timestamp]
+            logger.info(f"Prepared forecast data up to {last_test_timestamp}")
+        
+        # Remove duplicate index values and NaT
+        to_forecast_data = to_forecast_data[~to_forecast_data.index.duplicated(keep='first')]
+        to_forecast_data = to_forecast_data[to_forecast_data.index.notna()]
+        
+        # Generate forecasts for each model
+        model_forecasts = []
+        for custom_name in custom_names:
+            logger.info(f"Generating real-time forecast for model: {custom_name}")
+            
+            try:
+                # Get forecast for remaining hours
+                forecast_df = _forecast_24_hours(custom_name, to_forecast_data)
+                
+                # Extract forecast values for hours that exist in test_data
+                forecasts = []
+                for timestamp in test_data.index:
+                    hour = timestamp.hour
+                    
+                    try:
+                        if timestamp in forecast_df.index and 'forecast' in forecast_df.columns:
+                            forecast_value = forecast_df.loc[timestamp, 'forecast']
+                            if pd.notna(forecast_value):
+                                forecasts.append({
+                                    "hour": hour,
+                                    "forecast": float(forecast_value)
+                                })
+                            else:
+                                logger.warning(f"Forecast value is NaN for {custom_name} at hour {hour}")
+                                forecasts.append({
+                                    "hour": hour,
+                                    "forecast": None
+                                })
+                        else:
+                            logger.warning(f"Forecast timestamp for hour {hour} not found in forecast_df for {custom_name}")
+                            forecasts.append({
+                                "hour": hour,
+                                "forecast": None
+                            })
+                    except Exception as e:
+                        logger.error(f"Error accessing forecast value for {custom_name} at hour {hour}: {e}")
+                        forecasts.append({
+                            "hour": hour,
+                            "forecast": None
+                        })
+                
+                model_forecasts.append({
+                    "custom_name": custom_name,
+                    "forecasts": forecasts
+                })
+                
+                logger.info(f"Completed real-time forecast for model: {custom_name}")
+                
+            except FileNotFoundError:
+                error_msg = f"Model files not found for: {custom_name}"
+                logger.error(error_msg)
+                # Add empty forecast with error indicator for available hours
+                model_forecasts.append({
+                    "custom_name": custom_name,
+                    "forecasts": [{"hour": ts.hour, "forecast": None} for ts in test_data.index],
+                    "error": "Model not found"
+                })
+            except Exception as e:
+                error_msg = f"Error generating forecast for {custom_name}: {str(e)}"
+                logger.error(error_msg)
+                # Add empty forecast with error indicator for available hours
+                model_forecasts.append({
+                    "custom_name": custom_name,
+                    "forecasts": [{"hour": ts.hour, "forecast": None} for ts in test_data.index],
+                    "error": str(e)
+                })
+        
+        logger.info(f"Completed real-time forecasts for all {len(custom_names)} models")
+        
+        return {
+            "current_hour": current_hour,
+            "historical_actual": historical_actual,
+            "historical_forecasted": historical_forecasted,
+            "model_forecasts": model_forecasts
+        }
 
 def _forecast_24_hours(custom_name: str, to_forecast_data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -543,4 +818,19 @@ def get_test_data_for_date(input_data: pd.DataFrame, date: str) -> pd.DataFrame:
         logger.warning(f"No data found for forecast date {date}")
     
     return test_data
+
+
+def get_current_dhaka_hour() -> int:
+    """
+    Get the current hour in Dhaka timezone (UTC+6)
+    
+    Returns:
+        Integer representing current hour in Dhaka (0-23)
+    """
+    # Dhaka is UTC+6
+    dhaka_tz = timezone(timedelta(hours=6))
+    current_dhaka_time = datetime.now(dhaka_tz)
+    current_hour = current_dhaka_time.hour
+    logger.info(f"Current Dhaka time: {current_dhaka_time}, Hour: {current_hour}")
+    return current_hour
 

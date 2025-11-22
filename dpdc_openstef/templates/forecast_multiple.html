@@ -90,6 +90,9 @@
                         <button type="submit" class="btn btn-primary" id="forecastBtn">
                             <i class="bi bi-lightning-charge"></i> Backtest Models
                         </button>
+                        <button type="button" class="btn btn-success" id="generateForecastBtn">
+                            <i class="bi bi-graph-up"></i> Generate Forecast
+                        </button>
                     </div>
                 </form>
             </div>
@@ -130,6 +133,40 @@
         </div>
     </div>
 </div>
+
+<!-- Real-Time Forecast Results Section -->
+<div class="row mt-4">
+    <div class="col-lg-12">
+        <!-- Real-Time Forecast Chart -->
+        <div class="card" id="realtimeChartCard" style="display: none;">
+            <div class="card-header">
+                <i class="bi bi-bar-chart-line"></i> <span id="realtimeChartTitle">Real-Time Forecast</span>
+            </div>
+            <div class="card-body">
+                <div id="realtimeForecastChart" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-12">
+        <!-- Real-Time Forecast Results Table -->
+        <div class="card" id="realtimeResultsCard" style="display: none;">
+            <div class="card-header">
+                <i class="bi bi-table"></i> Real-Time Forecast Results
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered">
+                        <thead id="realtimeResultsTableHead"></thead>
+                        <tbody id="realtimeResultsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -141,7 +178,7 @@ $(document).ready(function() {
     flatpickr("#date", {
         dateFormat: "Y-m-d",
         minDate: "2023-01-01",
-        maxDate: "2025-09-29"
+        // maxDate: "2025-09-29"
     });
 
     // Initialize multi-select with Select2
@@ -464,6 +501,325 @@ $(document).ready(function() {
         setTimeout(() => {
             $('.alert').alert('close');
         }, 5000);
+    }
+
+    // Generate Forecast button handler (new feature)
+    $('#generateForecastBtn').on('click', function() {
+        const date = $('#date').val();
+        if (!date) {
+            showAlert('Please select a date before generating forecasts.', 'warning');
+            return;
+        }
+
+        if (!weatherDataFetched) {
+            showAlert('Please fetch weather data before generating forecasts.', 'warning');
+            return;
+        }
+
+        const selectedModels = $('#model_names').val();
+        if (!selectedModels || selectedModels.length === 0) {
+            showAlert('Please select at least one model.', 'warning');
+            return;
+        }
+
+        const $generateBtn = $('#generateForecastBtn');
+        $generateBtn.prop('disabled', true);
+        $generateBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Generating...');
+
+        const formData = new FormData();
+        formData.append('date', $('#date').val());
+        formData.append('holiday', $('#holiday').val());
+        formData.append('holiday_type', $('#holiday_type').val());
+        formData.append('nation_event', $('#nation_event').val());
+        formData.append('model_names', selectedModels.join(','));
+        
+        fetch('/api/generate-forecast', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            // Check if response is not OK and try to parse error message
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    // If server returned an error object with message
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }).catch(parseError => {
+                    // If JSON parsing fails, throw generic error
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            displayRealtimeForecastResults(data);
+            
+            $generateBtn.prop('disabled', false);
+            $generateBtn.html('<i class="bi bi-graph-up"></i> Generate Forecast');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            // Display the actual error message from the server
+            showAlert(error.message || 'Failed to generate real-time forecasts.', 'danger');
+            
+            $generateBtn.prop('disabled', false);
+            $generateBtn.html('<i class="bi bi-graph-up"></i> Generate Forecast');
+        });
+    });
+
+    function displayRealtimeForecastResults(data) {
+        // data structure: {
+        //   current_hour: 11,
+        //   historical_actual: [{hour, load}],
+        //   historical_forecasted: [{hour, load}],
+        //   model_forecasts: [{custom_name, forecasts: [{hour, forecast}]}]
+        // }
+        
+        const currentHour = data.current_hour;
+        const historicalActual = data.historical_actual || [];
+        const historicalForecasted = data.historical_forecasted || [];
+        const modelForecasts = data.model_forecasts || [];
+        
+        if (modelForecasts.length === 0) {
+            showAlert('No forecast data returned.', 'warning');
+            return;
+        }
+
+        // Update chart title with selected date and current hour
+        const selectedDate = $('#date').val();
+        $('#realtimeChartTitle').text(`Real-Time Forecast for ${selectedDate} (Current Hour: ${currentHour})`);
+
+        // Build table header - only show forecasted hours (current hour to 23)
+        let headerHtml = '<tr>';
+        headerHtml += '<th class="text-center border">Hour</th>';
+        
+        // Add model headers
+        modelForecasts.forEach(modelData => {
+            headerHtml += `<th class="text-center border">${modelData.custom_name}</th>`;
+        });
+        headerHtml += '</tr>';
+        
+        $('#realtimeResultsTableHead').html(headerHtml);
+
+        // Build table body - only show forecasted hours (current hour to 23)
+        let bodyHtml = '';
+        for (let hour = currentHour; hour <= 23; hour++) {
+            bodyHtml += `<tr><td class="text-center"><strong>${hour}</strong></td>`;
+            
+            // Add forecast value for each model
+            modelForecasts.forEach(modelData => {
+                const forecastData = modelData.forecasts?.find(f => f.hour === hour);
+                const forecastValue = forecastData?.forecast;
+                
+                if (forecastValue !== null && forecastValue !== undefined) {
+                    bodyHtml += `<td class="text-center">${forecastValue.toFixed(2)}</td>`;
+                } else {
+                    bodyHtml += `<td class="text-center text-muted">N/A</td>`;
+                }
+            });
+            
+            bodyHtml += '</tr>';
+        }
+
+        $('#realtimeResultsTableBody').html(bodyHtml);
+        
+        // Create Plotly chart
+        createRealtimeForecastChart(data);
+        
+        // Show both chart and table
+        $('#realtimeChartCard').slideDown(400);
+        $('#realtimeResultsCard').slideDown(400, function() {
+            // Scroll to the chart card and focus on it after slide down animation completes
+            $('html, body').animate({
+                scrollTop: $('#realtimeChartCard').offset().top - 20
+            }, 600);
+            $('#realtimeChartCard').focus();
+        });
+    }
+
+    function createRealtimeForecastChart(data) {
+        const currentHour = data.current_hour;
+        const historicalActual = data.historical_actual || [];
+        const historicalForecasted = data.historical_forecasted || [];
+        const modelForecasts = data.model_forecasts || [];
+        
+        const traces = [];
+        
+        // Add historical actual load trace (hour 0 to current_hour - 1)
+        if (historicalActual.length > 0) {
+            const hours = historicalActual.map(d => d.hour);
+            const loads = historicalActual.map(d => d.load);
+            traces.push({
+                x: hours,
+                y: loads,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Actual Load (Historical)',
+                line: {
+                    color: 'rgb(0, 0, 0)',
+                    width: 3,
+                    dash: 'solid'
+                },
+                marker: {
+                    size: 8,
+                    color: 'rgb(0, 0, 0)'
+                }
+            });
+        }
+        
+        // Add historical forecasted load trace (hour 0 to current_hour - 1)
+        if (historicalForecasted.length > 0) {
+            const hours = historicalForecasted.map(d => d.hour);
+            const loads = historicalForecasted.map(d => d.load);
+            traces.push({
+                x: hours,
+                y: loads,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Forecasted Load (Historical)',
+                line: {
+                    color: 'rgb(128, 128, 128)',
+                    width: 2,
+                    dash: 'dash'
+                },
+                marker: {
+                    size: 6,
+                    color: 'rgb(128, 128, 128)'
+                }
+            });
+        }
+        
+        // Add traces for each model's forecast (current_hour to 23)
+        const colors = [
+            'rgb(31, 119, 180)', // blue
+            'rgb(255, 127, 14)', // orange
+            'rgb(44, 160, 44)',  // green
+            'rgb(214, 39, 40)',  // red
+            'rgb(148, 103, 189)', // purple
+            'rgb(140, 86, 75)',  // brown
+            'rgb(227, 119, 194)', // pink
+            'rgb(127, 127, 127)', // gray
+            'rgb(188, 189, 34)',  // olive
+            'rgb(23, 190, 207)'   // cyan
+        ];
+        
+        modelForecasts.forEach((modelData, idx) => {
+            const hours = modelData.forecasts?.map(f => f.hour) || [];
+            const forecastValues = modelData.forecasts?.map(f => f.forecast) || [];
+            const color = colors[idx % colors.length];
+            
+            traces.push({
+                x: hours,
+                y: forecastValues,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: `${modelData.custom_name}`,
+                line: {
+                    color: color,
+                    width: 2
+                },
+                marker: {
+                    size: 6
+                }
+            });
+        });
+        
+        // Add vertical line at current hour
+        const shapes = [{
+            type: 'line',
+            x0: currentHour,
+            x1: currentHour,
+            y0: 0,
+            y1: 1,
+            yref: 'paper',
+            line: {
+                color: 'rgba(255, 0, 0, 0.5)',
+                width: 2,
+                dash: 'dot'
+            }
+        }];
+        
+        // Add annotation for current hour
+        const annotations = [{
+            x: currentHour,
+            y: 1,
+            yref: 'paper',
+            text: `Current Hour: ${currentHour}`,
+            showarrow: true,
+            arrowhead: 2,
+            ax: 0,
+            ay: -40,
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
+            bordercolor: 'rgba(255, 0, 0, 0.5)',
+            borderwidth: 1
+        }];
+        
+        const layout = {
+            autosize: true,
+            title: {
+                text: 'Real-Time Load Forecast',
+                font: {
+                    size: 18,
+                    family: 'Arial, sans-serif'
+                }
+            },
+            xaxis: {
+                title: 'Hour of Day',
+                tickmode: 'linear',
+                tick0: 0,
+                dtick: 2,
+                gridcolor: 'rgba(0, 0, 0, 0.1)',
+                range: [-0.5, 23.5]
+            },
+            yaxis: {
+                title: 'Load (MW)',
+                gridcolor: 'rgba(0, 0, 0, 0.1)'
+            },
+            hovermode: 'x unified',
+            legend: {
+                orientation: 'h',
+                x: 0.5,
+                y: -0.2,
+                xanchor: 'center',
+                yanchor: 'top',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                bordercolor: 'rgba(0, 0, 0, 0.1)',
+                borderwidth: 1
+            },
+            plot_bgcolor: 'rgba(0, 0, 0, 0)',
+            paper_bgcolor: 'white',
+            margin: {
+                l: 60,
+                r: 40,
+                t: 60,
+                b: 100
+            },
+            font: {
+                family: 'Arial, sans-serif',
+                size: 12
+            },
+            shapes: shapes,
+            annotations: annotations
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+        };
+        
+        Plotly.newPlot('realtimeForecastChart', traces, layout, config).then(function() {
+            // Programmatically trigger 'reset axes' after chart is loaded
+            Plotly.relayout('realtimeForecastChart', {
+                'xaxis.autorange': true,
+                'yaxis.autorange': true
+            });
+        });
+        
+        // Handle window resize to make chart responsive
+        window.addEventListener('resize', function() {
+            Plotly.Plots.resize('realtimeForecastChart');
+        });
     }
 });
 </script>

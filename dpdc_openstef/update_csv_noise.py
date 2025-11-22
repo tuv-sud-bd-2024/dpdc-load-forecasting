@@ -3,6 +3,7 @@ import random
 from datetime import datetime, timedelta, timezone
 import shutil
 import os
+from zoneinfo import ZoneInfo
 
 def parse_date(date_str):
     # Format: 2023-01-01 06:00:00+00:00
@@ -36,14 +37,15 @@ def update_data():
     last_dt = parse_date(last_row['date_time'])
     
     # End time: previous hour from now
-    # Using system local time but stripping tz to match our naive logic above
+    # Using Dhaka timezone explicitly
     # We need to be careful about timezones. The file has +00:00.
     # The system date command returned +06 (Dhaka time).
     # The user implies the CSV timestamps are actually Local Time (Dhaka) labeled as +00:00.
-    # So we should generate up to previous hour of Local Time.
+    # So we should generate up to previous hour of Dhaka Time.
     
-    # Get current local time
-    now_local = datetime.now() # Local time (Dhaka)
+    # Get current time in Dhaka timezone
+    dhaka_tz = ZoneInfo("Asia/Dhaka")
+    now_local = datetime.now(dhaka_tz)  # Current time in Dhaka timezone
     end_dt = now_local.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
     
     # Make end_dt naive for comparison with the naive parse of file dates

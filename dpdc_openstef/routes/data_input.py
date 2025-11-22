@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
+from services.weather_service import get_weather_for_date
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,16 @@ async def update_data_input(
         records_updated = 0
         records_created = 0
         
+        # Fetch weather data for the date (needed for both updates and creates)
+        selected_date = pd.to_datetime(date)
+        try:
+            weather_data = get_weather_for_date(selected_date)
+            logger.info(f"Fetched weather data for {date}: {len(weather_data)} hours")
+        except Exception as e:
+            logger.error(f"Failed to fetch weather data for {date}: {e}")
+            # Use default empty weather data
+            weather_data = [{'temp': 0, 'dwpt': 0, 'rhum': 0, 'prcp': 0, 'wdir': 0, 'wspd': 0, 'pres': 0, 'coco': 0} for _ in range(24)]
+        
         # Process existing lines and update matching timestamps
         updated_lines = []
         header_line = lines[0] if lines else "date_time,load,is_holiday,holiday_type,national_event_type,temp,dwpt,rhum,prcp,wdir,wspd,pres,coco,forecasted_load\n"
@@ -159,13 +170,30 @@ async def update_data_input(
                 hour_data = timestamps_to_update[line_timestamp]
                 timestamps_found.add(line_timestamp)
                 
-                # Update only the specific columns: load, is_holiday, holiday_type, national_event_type, forecasted_load
-                parts[1] = str(hour_data['load'])  # load
-                parts[2] = str(is_holiday)  # is_holiday
-                parts[3] = str(holiday_type)  # holiday_type
-                parts[4] = str(national_event_type)  # national_event_type
-                parts[13] = str(hour_data['forecasted_load'])  # forecasted_load
-                records_updated += 1
+                # Get the hour from timestamp to fetch corresponding weather data
+                try:
+                    timestamp_obj = pd.to_datetime(line_timestamp)
+                    hour = timestamp_obj.hour
+                    weather_hour = weather_data[hour] if hour < len(weather_data) else weather_data[0]
+                    
+                    # Update columns: load, is_holiday, holiday_type, national_event_type, weather data, forecasted_load
+                    parts[1] = str(hour_data['load'])  # load
+                    parts[2] = str(is_holiday)  # is_holiday
+                    parts[3] = str(holiday_type)  # holiday_type
+                    parts[4] = str(national_event_type)  # national_event_type
+                    parts[5] = str(weather_hour['temp'])  # temp
+                    parts[6] = str(weather_hour['dwpt'])  # dwpt
+                    parts[7] = str(weather_hour['rhum'])  # rhum
+                    parts[8] = str(weather_hour['prcp'])  # prcp
+                    parts[9] = str(weather_hour['wdir'])  # wdir
+                    parts[10] = str(weather_hour['wspd'])  # wspd
+                    parts[11] = str(weather_hour['pres'])  # pres
+                    parts[12] = str(weather_hour['coco'])  # coco
+                    parts[13] = str(hour_data['forecasted_load'])  # forecasted_load
+                    records_updated += 1
+                except Exception as e:
+                    logger.error(f"Error updating weather data for timestamp {line_timestamp}: {e}")
+                    # Keep original parts if weather update fails
             
             # Store the line with its timestamp for sorting
             try:
@@ -188,13 +216,35 @@ async def update_data_input(
         timestamps_to_create = set(timestamps_to_update.keys()) - timestamps_found
         
         if timestamps_to_create:
-            # Create new rows for missing timestamps
+            # Create new rows for missing timestamps (weather data already fetched above)
             for timestamp_str in timestamps_to_create:
                 hour_data = timestamps_to_update[timestamp_str]
-                new_row = f"{timestamp_str},{hour_data['load']},{is_holiday},{holiday_type},{national_event_type},0,0,0,0,0,0,0,0,{hour_data['forecasted_load']}\n"
                 
                 try:
                     timestamp_obj = pd.to_datetime(timestamp_str)
+                    hour = timestamp_obj.hour
+                    
+                    # Get weather data for this specific hour
+                    weather_hour = weather_data[hour] if hour < len(weather_data) else weather_data[0]
+                    
+                    # Create row with weather data
+                    new_row = (
+                        f"{timestamp_str},"
+                        f"{hour_data['load']},"
+                        f"{is_holiday},"
+                        f"{holiday_type},"
+                        f"{national_event_type},"
+                        f"{weather_hour['temp']},"
+                        f"{weather_hour['dwpt']},"
+                        f"{weather_hour['rhum']},"
+                        f"{weather_hour['prcp']},"
+                        f"{weather_hour['wdir']},"
+                        f"{weather_hour['wspd']},"
+                        f"{weather_hour['pres']},"
+                        f"{weather_hour['coco']},"
+                        f"{hour_data['forecasted_load']}\n"
+                    )
+                    
                     existing_data.append({
                         'timestamp': timestamp_obj,
                         'timestamp_str': timestamp_str,

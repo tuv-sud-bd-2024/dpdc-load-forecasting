@@ -7,3 +7,4 @@ jupyter==1.0
 pandas
 xgboost
 openpyxl
+meteostat

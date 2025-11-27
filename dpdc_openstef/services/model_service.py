@@ -7,7 +7,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from fastapi import UploadFile
 from openstef.data_classes.prediction_job import PredictionJobDataClass
 from openstef.pipeline.train_model import train_model_pipeline
 from openstef.pipeline.create_forecast import create_forecast_pipeline
@@ -121,8 +120,7 @@ class ModelService:
         custom_name: str, 
         training_data_start_date: str, 
         training_data_end_date: str, 
-        hyperparams_dict: Dict[str, Any],
-        training_data_file: Optional[UploadFile] = None
+        hyperparams_dict: Dict[str, Any]
     ) -> str:
         """
         Train a model with comprehensive hyperparameters
@@ -133,7 +131,6 @@ class ModelService:
             training_data_start_date: Start date for training data
             training_data_end_date: End date for training data
             hyperparams_dict: Dictionary of hyperparameters
-            training_data_file: Optional uploaded training data file (ignored as per requirements)
             
         Returns:
             Status message
@@ -159,7 +156,7 @@ class ModelService:
         
         pj = PredictionJobDataClass(**pj_dict)
         
-        # Load training data from default path (file upload is ignored as per requirements)
+        # Load training data from default path
         input_data = pd.read_csv(TRAINING_DATA_PATH, index_col=0, parse_dates=True)
         
         # Drop unnecessary columns if they exist

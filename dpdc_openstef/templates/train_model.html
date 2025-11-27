@@ -29,14 +29,6 @@
                         <input type="text" class="form-control" id="custom_name" required>
                     </div>
 
-                    <!-- Training Data File Upload -->
-                    <div class="mb-4">
-                        <label for="training_data_file" class="form-label">Training Data</label>
-                        <input type="file" class="form-control" id="training_data_file" name="training_data_file" 
-                               accept=".csv,.xls,.xlsx">
-                        <small class="text-muted">Upload training data file (CSV, XLS, or XLSX format) - Optional</small>
-                    </div>
-
                     <!-- Training Data Date Range -->
                     <div class="mb-4">
                         <label class="form-label">Training Data Period <span class="text-danger">*</span></label>
@@ -535,12 +527,6 @@ $(document).ready(function() {
         formData.append('training_data_start_date', training_data_start_date);
         formData.append('training_data_end_date', training_data_end_date);
         formData.append('hyperparams', JSON.stringify(hyperparams));
-        
-        // Add file if selected
-        const fileInput = document.getElementById('training_data_file');
-        if (fileInput.files.length > 0) {
-            formData.append('training_data_file', fileInput.files[0]);
-        }
         
         // Submit to API
         fetch('/api/train', {

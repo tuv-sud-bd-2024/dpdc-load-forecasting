@@ -59,7 +59,10 @@
                         <div class="col-6 mb-3">
                             <label for="holiday_type" class="form-label">Holiday Type <span class="text-danger">*</span></label>
                             <select class="form-select" id="holiday_type" name="holiday_type" required>
-                                <option value="0" selected>0</option>
+                                <option value="0" selected>N/A</option>
+                                {% for ht in holiday_type_options %}
+                                    <option value="{{ ht.code_int }}">{{ ht.holiday_name }} ({{ ht.code_str }})</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -158,8 +161,8 @@ $(document).ready(function() {
         width: '100%'
     });
 
-    // Initialize common dropdowns using shared utility
-    initializeCommonDropdowns();
+    // Initialize nation_event dropdown (holiday_type is rendered server-side)
+    populateNationEventDropdown('nation_event');
 
     // Fetch Weather Data
     $('#fetchWeatherBtn').on('click', function() {

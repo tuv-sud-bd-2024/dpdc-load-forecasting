@@ -3,6 +3,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Optional
+from logging.handlers import TimedRotatingFileHandler
 
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
@@ -24,7 +25,18 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
     # Create handlers
     handlers = [logging.StreamHandler(sys.stdout)]
     if log_file:
-        handlers.append(logging.FileHandler(log_file, encoding='utf-8'))
+        # Roll logs weekly (Monday 00:00 by default), keep a limited history.
+        # If you prefer Sunday rollovers, change when="W6".
+        handlers.append(
+            TimedRotatingFileHandler(
+                log_file,
+                when="W0",
+                interval=1,
+                backupCount=8,  # keep ~8 weeks of history
+                encoding="utf-8",
+                utc=True,
+            )
+        )
     
     # Resolve level safely (fallback to INFO on typos)
     level = getattr(logging, log_level.upper(), logging.INFO)

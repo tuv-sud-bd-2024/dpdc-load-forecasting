@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
+HOLIDAY_CODES_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "config" / "Holiday_Codes.csv"
+
 def _load_holiday_type_options() -> List[Dict[str, Any]]:
     """
     Load holiday type options from Holiday_Codes.csv.
@@ -20,26 +22,13 @@ def _load_holiday_type_options() -> List[Dict[str, Any]]:
     Returns list entries shaped like:
       {"code_int": 1, "code_str": "01", "holiday_name": "National holiday"}
     """
-    base_dir = Path(__file__).resolve().parent.parent
-    candidate_paths = [
-        base_dir / "static" / "configs" / "Holiday_Codes.csv",
-        base_dir / "static" / "config" / "Holiday_Codes.csv",
-    ]
-
-    csv_path: Path | None = None
-    for p in candidate_paths:
-        if p.exists():
-            csv_path = p
-            break
-
-    if csv_path is None:
+    if not HOLIDAY_CODES_CSV_PATH.exists():
         raise FileNotFoundError(
-            "Holiday codes CSV not found. Expected at "
-            f"{candidate_paths[0]} (preferred) or {candidate_paths[1]}."
+            f"Holiday codes CSV not found at expected path: {HOLIDAY_CODES_CSV_PATH}"
         )
 
     options: List[Dict[str, Any]] = []
-    with csv_path.open(newline="", encoding="utf-8") as f:
+    with HOLIDAY_CODES_CSV_PATH.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             code_str = (row.get("Code") or "").strip()

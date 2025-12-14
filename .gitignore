@@ -1,2 +1,10 @@
 dpdc_openstef/trained_models/
 
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+
+# Core dumps
+core
+core.*
+

@@ -22,10 +22,11 @@ services:
       - ./trained_models:/app/trained_models
     environment:
       - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
+      - LOG_FILE=logs/app.log
     restart: unless-stopped
     # Override command for development (already set in Dockerfile but can be customized here)
-    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level info
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level ${LOG_LEVEL:-info}"
     networks:
       - dpdc_network
 

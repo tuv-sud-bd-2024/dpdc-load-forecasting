@@ -372,3 +372,21 @@ date_time                               ...
 [2460 rows x 11 columns]
 2025-11-10 17:09:46,368 - services.model_service - INFO - Returning forecast result: {'timestamp': '2025-06-19T12:00:00+00:00', 'forecast': 1151.3388671875, 'custom_name': 'after_refact_01'}
 2025-11-10 17:09:46,369 - routes.forecast - INFO - Forecast completed successfully for model: after_refact_01
+2025-12-14 02:44:23,721 - utils.logger - INFO - Logging configured with level: DEBUG
+2025-12-14 02:44:23,722 - utils.logger - INFO - Logging to file: logs/app.log
+2025-12-14 02:44:47,210 - utils.logger - INFO - Logging configured with level: DEBUG
+2025-12-14 02:44:47,210 - utils.logger - INFO - Logging to file: logs/app.log
+2025-12-14 02:45:06,897 - utils.logger - INFO - Logging configured with level: DEBUG
+2025-12-14 02:45:06,897 - utils.logger - INFO - Logging to file: logs/app.log
+2025-12-14 02:45:06,924 - uvicorn.error - INFO - Started server process [2465]
+2025-12-14 02:45:06,924 - uvicorn.error - INFO - Waiting for application startup.
+2025-12-14 02:45:06,925 - utils.logger - INFO - Logging configured with level: DEBUG
+2025-12-14 02:45:06,925 - utils.logger - INFO - Logging to file: logs/app.log
+2025-12-14 02:45:06,925 - __main__ - INFO - DPDC OpenSTEF application started successfully
+2025-12-14 02:45:06,925 - uvicorn.error - INFO - Application startup complete.
+2025-12-14 02:45:06,926 - uvicorn.error - INFO - Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+2025-12-14 02:45:08,829 - uvicorn.error - INFO - Shutting down
+2025-12-14 02:45:08,929 - uvicorn.error - INFO - Waiting for application shutdown.
+2025-12-14 02:45:08,929 - __main__ - INFO - DPDC OpenSTEF application shutting down
+2025-12-14 02:45:08,930 - uvicorn.error - INFO - Application shutdown complete.
+2025-12-14 02:45:08,930 - uvicorn.error - INFO - Finished server process [2465]

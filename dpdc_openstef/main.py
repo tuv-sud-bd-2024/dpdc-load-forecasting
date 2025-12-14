@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import logging
 import os
+from contextlib import asynccontextmanager
 
 # Import routers
 from routes import train_model, forecast_multiple, data_input, dashboard, backtesting
@@ -9,6 +10,8 @@ from routes import train_model, forecast_multiple, data_input, dashboard, backte
 from utils.logger import setup_logging
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+# uvicorn expects lowercase log levels (e.g., "debug"), while Python logging often uses "DEBUG".
+UVICORN_LOG_LEVEL = LOG_LEVEL.lower()
 # Set LOG_FILE empty to disable file logging
 LOG_FILE = os.getenv("LOG_FILE", "logs/app.log") or None
 
@@ -18,14 +21,15 @@ setup_logging(log_level=LOG_LEVEL, log_file=LOG_FILE)
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DPDC OpenSTEF")
-
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     """Ensure desired log level is active (even under uvicorn CLI)."""
     setup_logging(log_level=LOG_LEVEL, log_file=LOG_FILE)
     logger.info("DPDC OpenSTEF application started successfully")
+    yield
+
+
+app = FastAPI(title="DPDC OpenSTEF", lifespan=lifespan)
 
 
 # @app.on_event("shutdown")
@@ -48,5 +52,5 @@ app.include_router(dashboard.router, tags=["Dashboard"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_config=None, log_level=LOG_LEVEL)
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_config=None, log_level=UVICORN_LOG_LEVEL)
 

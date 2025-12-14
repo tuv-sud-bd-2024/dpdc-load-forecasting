@@ -26,7 +26,7 @@ services:
       - LOG_FILE=logs/app.log
     restart: unless-stopped
     # Override command for development (already set in Dockerfile but can be customized here)
-    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level ${LOG_LEVEL:-info}"
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level $(echo ${LOG_LEVEL:-info} | tr '[:upper:]' '[:lower:]')"
     networks:
       - dpdc_network
 

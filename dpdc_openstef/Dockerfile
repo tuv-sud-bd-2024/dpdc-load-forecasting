@@ -30,4 +30,4 @@ COPY . .
 EXPOSE 8080
 
 # Command to run the application (LOG_LEVEL controls verbosity)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level ${LOG_LEVEL:-info}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level $(echo ${LOG_LEVEL:-info} | tr '[:upper:]' '[:lower:]')"]

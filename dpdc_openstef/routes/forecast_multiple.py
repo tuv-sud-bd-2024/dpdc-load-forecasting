@@ -2,14 +2,65 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from typing import List
+from typing import List, Dict, Any
 import logging
+import csv
+from pathlib import Path
 from services.model_service import ModelService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
+def _load_holiday_type_options() -> List[Dict[str, Any]]:
+    """
+    Load holiday type options from Holiday_Codes.csv.
+
+    Returns list entries shaped like:
+      {"code_int": 1, "code_str": "01", "holiday_name": "National holiday"}
+    """
+    base_dir = Path(__file__).resolve().parent.parent
+    candidate_paths = [
+        base_dir / "static" / "configs" / "Holiday_Codes.csv",
+        base_dir / "static" / "config" / "Holiday_Codes.csv",
+    ]
+
+    csv_path: Path | None = None
+    for p in candidate_paths:
+        if p.exists():
+            csv_path = p
+            break
+
+    if csv_path is None:
+        raise FileNotFoundError(
+            "Holiday codes CSV not found. Expected at "
+            f"{candidate_paths[0]} (preferred) or {candidate_paths[1]}."
+        )
+
+    options: List[Dict[str, Any]] = []
+    with csv_path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code_str = (row.get("Code") or "").strip()
+            holiday_name = (row.get("Holiday_Name") or "").strip()
+            if not code_str or not holiday_name:
+                continue
+            try:
+                code_int = int(code_str)
+            except ValueError:
+                logger.warning(f"Skipping invalid holiday code: {code_str!r}")
+                continue
+            options.append(
+                {
+                    "code_int": code_int,
+                    "code_str": code_str,
+                    "holiday_name": holiday_name,
+                }
+            )
+
+    options.sort(key=lambda x: x["code_int"])
+    return options
 
 
 @router.get("/forecast-multiple", response_class=HTMLResponse)
@@ -20,7 +71,8 @@ async def forecast_multiple_page(request: Request):
         {
             "request": request, 
             "active_page": "forecast-multiple", 
-            "available_models": ModelService.get_trained_models()
+            "available_models": ModelService.get_trained_models(),
+            "holiday_type_options": _load_holiday_type_options(),
         }
     )
 

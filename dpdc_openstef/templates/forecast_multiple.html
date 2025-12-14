@@ -59,7 +59,10 @@
                         <div class="col-6 mb-3">
                             <label for="holiday_type" class="form-label">Holiday Type <span class="text-danger">*</span></label>
                             <select class="form-select" id="holiday_type" name="holiday_type" required>
-                                <option value="0" selected>0</option>
+                                <option value="0" selected>N/A</option>
+                                {% for ht in holiday_type_options %}
+                                    <option value="{{ ht.code_int }}">{{ ht.holiday_name }} ({{ ht.code_str }})</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -150,6 +153,15 @@ $(document).ready(function() {
     const dhakaToday = getDhakaCurrentDate();
     $('#date').val(dhakaToday);
 
+    // If holiday is "0 (No)", force holiday_type to "0 (N/A)"
+    function syncHolidayTypeWithHoliday() {
+        if ($('#holiday').val() === '0') {
+            $('#holiday_type').val('0');
+        }
+    }
+    $('#holiday').on('change', syncHolidayTypeWithHoliday);
+    syncHolidayTypeWithHoliday();
+
     // Initialize multi-select with Select2
     $('#model_names').select2({
         theme: 'bootstrap-5',
@@ -158,8 +170,8 @@ $(document).ready(function() {
         width: '100%'
     });
 
-    // Initialize common dropdowns using shared utility
-    initializeCommonDropdowns();
+    // Initialize nation_event dropdown (holiday_type is rendered server-side)
+    populateNationEventDropdown('nation_event');
 
     // Fetch Weather Data
     $('#fetchWeatherBtn').on('click', function() {

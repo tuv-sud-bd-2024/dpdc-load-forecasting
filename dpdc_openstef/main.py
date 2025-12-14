@@ -1,30 +1,50 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import logging
+import os
 
 # Import routers
 from routes import train_model, forecast_multiple, data_input, dashboard, backtesting
 # from routes import forecast  # Disabled
 from utils.logger import setup_logging
 
-# Setup logging once at startup
-setup_logging(log_level="INFO", log_file="logs/app.log")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+# Set LOG_FILE empty to disable file logging
+LOG_FILE = os.getenv("LOG_FILE", "logs/app.log") or None
+
+# Uvicorn expects lowercase log levels (e.g. "debug"), while Python logging often uses
+# uppercase names (e.g. "DEBUG"). Normalize to avoid KeyError in uvicorn's LOG_LEVELS.
+_UVICORN_LOG_LEVEL_MAP = {
+    "WARN": "warning",
+    "WARNING": "warning",
+    "FATAL": "critical",
+}
+
+# Configure logging on import (helps for non-uvicorn runs), but we also re-apply it on
+# FastAPI startup because uvicorn's own log config may override logging at process start.
+setup_logging(log_level=LOG_LEVEL, log_file=LOG_FILE)
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="DPDC OpenSTEF")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan handler (replaces deprecated on_event startup/shutdown)."""
+    # Ensure desired log level is active (even under uvicorn CLI).
+    setup_logging(log_level=LOG_LEVEL, log_file=LOG_FILE)
+    
+    # Ensure the trained_models directory exists within dpdc_openstef/.
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    trained_models_dir = os.path.join(base_dir, "trained_models")
+    os.makedirs(trained_models_dir, exist_ok=True)
+    logger.info("Ensured trained_models directory exists at %s", trained_models_dir)
+
+    logger.info("DPDC OpenSTEF application started successfully")
+    yield
+    logger.info("DPDC OpenSTEF application shutting down")
 
 
-# @app.on_event("startup")
-# async def startup_event():
-#     """Log application startup"""
-#     logger.info("DPDC OpenSTEF application started successfully")
-
-
-# @app.on_event("shutdown")
-# async def shutdown_event():
-#     """Log application shutdown"""
-#     logger.info("DPDC OpenSTEF application shutting down")
+app = FastAPI(title="DPDC OpenSTEF", lifespan=lifespan)
 
 
 # Mount static files
@@ -41,5 +61,12 @@ app.include_router(dashboard.router, tags=["Dashboard"])
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, port=8080)
+    uvicorn_log_level = _UVICORN_LOG_LEVEL_MAP.get(LOG_LEVEL.upper(), LOG_LEVEL).lower()
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8080,
+        log_config=None,
+        log_level=uvicorn_log_level,
+    )
 

@@ -32,6 +32,13 @@ async def lifespan(app: FastAPI):
     """Lifespan handler (replaces deprecated on_event startup/shutdown)."""
     # Ensure desired log level is active (even under uvicorn CLI).
     setup_logging(log_level=LOG_LEVEL, log_file=LOG_FILE)
+    
+    # Ensure the trained_models directory exists within dpdc_openstef/.
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    trained_models_dir = os.path.join(base_dir, "trained_models")
+    os.makedirs(trained_models_dir, exist_ok=True)
+    logger.info("Ensured trained_models directory exists at %s", trained_models_dir)
+
     logger.info("DPDC OpenSTEF application started successfully")
     yield
     logger.info("DPDC OpenSTEF application shutting down")

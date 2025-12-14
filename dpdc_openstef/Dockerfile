@@ -29,5 +29,5 @@ COPY . .
 # Expose the port the app runs on
 EXPOSE 8080
 
-# Command to run the application with hot reload for development
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+# Command to run the application (LOG_LEVEL controls verbosity)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8080 --reload --log-level ${LOG_LEVEL:-info}"]

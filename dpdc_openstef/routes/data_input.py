@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import os
 from pathlib import Path
 from services.weather_service import get_weather_for_date
-from .forecast_multiple import _load_holiday_type_options
+from .forecast_multiple import _load_holiday_type_options, _load_national_event_options
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ async def data_input_page(request: Request):
             "request": request,
             "active_page": "data_input",
             "holiday_type_options": _load_holiday_type_options(),
+            "national_event_options": _load_national_event_options(),
         },
     )
 

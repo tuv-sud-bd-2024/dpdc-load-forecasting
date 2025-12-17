@@ -14,10 +14,9 @@ from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
-HOLIDAY_CODES_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "config" / "Holiday_Codes.csv"
-NATIONAL_EVENTS_CSV_PATH = (
-    Path(__file__).resolve().parent.parent / "static" / "config" / "National_Event_Codes.csv"
-)
+# Keep paths consistent with other services (e.g. TRAINING_DATA_PATH in model_service.py)
+HOLIDAY_CODES_CSV_PATH = "./static/config/Holiday_Codes.csv"
+NATIONAL_EVENTS_CSV_PATH = "./static/config/National_Event_Codes.csv"
 
 
 def _load_holiday_type_options() -> List[Dict[str, Any]]:
@@ -27,13 +26,14 @@ def _load_holiday_type_options() -> List[Dict[str, Any]]:
     Returns list entries shaped like:
       {"code_int": 1, "code_str": "01", "holiday_name": "National holiday"}
     """
-    if not HOLIDAY_CODES_CSV_PATH.exists():
+    holiday_codes_path = Path(HOLIDAY_CODES_CSV_PATH)
+    if not holiday_codes_path.exists():
         raise FileNotFoundError(
-            f"Holiday codes CSV not found at expected path: {HOLIDAY_CODES_CSV_PATH}"
+            f"Holiday codes CSV not found at expected path: {holiday_codes_path}"
         )
 
     options: List[Dict[str, Any]] = []
-    with HOLIDAY_CODES_CSV_PATH.open(newline="", encoding="utf-8") as f:
+    with holiday_codes_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             code_str = (row.get("Code") or "").strip()
@@ -64,13 +64,14 @@ def _load_national_event_options() -> List[Dict[str, Any]]:
     Returns list entries shaped like:
       {"code_int": 0, "code_str": "0", "national_event_name": "No Event"}
     """
-    if not NATIONAL_EVENTS_CSV_PATH.exists():
+    national_events_path = Path(NATIONAL_EVENTS_CSV_PATH)
+    if not national_events_path.exists():
         raise FileNotFoundError(
-            f"National events CSV not found at expected path: {NATIONAL_EVENTS_CSV_PATH}"
+            f"National events CSV not found at expected path: {national_events_path}"
         )
 
     options: List[Dict[str, Any]] = []
-    with NATIONAL_EVENTS_CSV_PATH.open(newline="", encoding="utf-8") as f:
+    with national_events_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             code_str = (row.get("Code") or "").strip()

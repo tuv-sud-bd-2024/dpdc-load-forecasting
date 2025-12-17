@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import os
 from pathlib import Path
 from services.weather_service import get_weather_for_date
+from .forecast_multiple import _load_holiday_type_options
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,14 @@ CSV_FILE_PATH = Path("static/master_data_with_forecasted.csv")
 @router.get("/data-input", response_class=HTMLResponse)
 async def data_input_page(request: Request):
     """Data Input page"""
-    return templates.TemplateResponse("data_input.html", {"request": request, "active_page": "data_input"})
+    return templates.TemplateResponse(
+        "data_input.html",
+        {
+            "request": request,
+            "active_page": "data_input",
+            "holiday_type_options": _load_holiday_type_options(),
+        },
+    )
 
 
 @router.get("/api/data-input")

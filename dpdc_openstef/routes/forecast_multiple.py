@@ -14,8 +14,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 HOLIDAY_CODES_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "config" / "Holiday_Codes.csv"
-NATIONAL_EVENTS_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "National_Events.csv"
-NATIONAL_EVENTS_FALLBACK_CSV_PATH = (
+NATIONAL_EVENTS_CSV_PATH = (
     Path(__file__).resolve().parent.parent / "static" / "config" / "National_Event_Codes.csv"
 )
 
@@ -58,19 +57,18 @@ def _load_holiday_type_options() -> List[Dict[str, Any]]:
 
 def _load_national_event_options() -> List[Dict[str, Any]]:
     """
-    Load national event options from National_Events.csv (preferred) or fallback CSV.
+    Load national event options from National_Event_Codes.csv.
 
     Returns list entries shaped like:
       {"code_int": 0, "code_str": "0", "national_event_name": "No Event"}
     """
-    csv_path = NATIONAL_EVENTS_CSV_PATH if NATIONAL_EVENTS_CSV_PATH.exists() else NATIONAL_EVENTS_FALLBACK_CSV_PATH
-    if not csv_path.exists():
+    if not NATIONAL_EVENTS_CSV_PATH.exists():
         raise FileNotFoundError(
-            f"National events CSV not found at expected paths: {NATIONAL_EVENTS_CSV_PATH} or {NATIONAL_EVENTS_FALLBACK_CSV_PATH}"
+            f"National events CSV not found at expected path: {NATIONAL_EVENTS_CSV_PATH}"
         )
 
     options: List[Dict[str, Any]] = []
-    with csv_path.open(newline="", encoding="utf-8") as f:
+    with NATIONAL_EVENTS_CSV_PATH.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             code_str = (row.get("Code") or "").strip()

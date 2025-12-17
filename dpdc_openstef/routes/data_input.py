@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import os
 from pathlib import Path
 from services.weather_service import get_weather_for_date
-from .forecast_multiple import _load_holiday_type_options, _load_national_event_options
+from services.dropdown_service import _load_holiday_type_options, _load_national_event_options
 
 logger = logging.getLogger(__name__)
 

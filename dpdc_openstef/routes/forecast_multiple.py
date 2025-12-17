@@ -2,94 +2,14 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from typing import List, Dict, Any
 import logging
-import csv
-from pathlib import Path
 from services.model_service import ModelService
+from services.dropdown_service import _load_holiday_type_options, _load_national_event_options
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
-
-HOLIDAY_CODES_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "config" / "Holiday_Codes.csv"
-NATIONAL_EVENTS_CSV_PATH = (
-    Path(__file__).resolve().parent.parent / "static" / "config" / "National_Event_Codes.csv"
-)
-
-def _load_holiday_type_options() -> List[Dict[str, Any]]:
-    """
-    Load holiday type options from Holiday_Codes.csv.
-
-    Returns list entries shaped like:
-      {"code_int": 1, "code_str": "01", "holiday_name": "National holiday"}
-    """
-    if not HOLIDAY_CODES_CSV_PATH.exists():
-        raise FileNotFoundError(
-            f"Holiday codes CSV not found at expected path: {HOLIDAY_CODES_CSV_PATH}"
-        )
-
-    options: List[Dict[str, Any]] = []
-    with HOLIDAY_CODES_CSV_PATH.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            code_str = (row.get("Code") or "").strip()
-            holiday_name = (row.get("Holiday_Name") or "").strip()
-            if not code_str or not holiday_name:
-                continue
-            try:
-                code_int = int(code_str)
-            except ValueError:
-                logger.warning(f"Skipping invalid holiday code: {code_str!r}")
-                continue
-            options.append(
-                {
-                    "code_int": code_int,
-                    "code_str": code_str,
-                    "holiday_name": holiday_name,
-                }
-            )
-
-    options.sort(key=lambda x: x["code_int"])
-    return options
-
-
-def _load_national_event_options() -> List[Dict[str, Any]]:
-    """
-    Load national event options from National_Event_Codes.csv.
-
-    Returns list entries shaped like:
-      {"code_int": 0, "code_str": "0", "national_event_name": "No Event"}
-    """
-    if not NATIONAL_EVENTS_CSV_PATH.exists():
-        raise FileNotFoundError(
-            f"National events CSV not found at expected path: {NATIONAL_EVENTS_CSV_PATH}"
-        )
-
-    options: List[Dict[str, Any]] = []
-    with NATIONAL_EVENTS_CSV_PATH.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            code_str = (row.get("Code") or "").strip()
-            event_name = (row.get("National_Event_Name") or "").strip()
-            if not code_str or not event_name:
-                continue
-            try:
-                code_int = int(code_str)
-            except ValueError:
-                logger.warning(f"Skipping invalid national event code: {code_str!r}")
-                continue
-            options.append(
-                {
-                    "code_int": code_int,
-                    "code_str": code_str,
-                    "national_event_name": event_name,
-                }
-            )
-
-    options.sort(key=lambda x: x["code_int"])
-    return options
 
 
 @router.get("/forecast-multiple", response_class=HTMLResponse)

@@ -47,7 +47,9 @@
                     <div class="col-md-4">
                         <label for="nation_event" class="form-label">National Event <span class="text-danger">*</span></label>
                         <select class="form-select" id="nation_event" name="nation_event" required>
-                            <option value="0" selected>0</option>
+                            {% for ne in national_event_options %}
+                                <option value="{{ ne.code_int }}" {% if loop.first %}selected{% endif %}>{{ ne.national_event_name }} ({{ ne.code_str }})</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -113,8 +115,7 @@ $(document).ready(function() {
     currentDate = new Date().toISOString().split('T')[0];
     $('#dateSelector').val(currentDate);
 
-    // Initialize nation_event dropdown (holiday_type is rendered server-side)
-    populateNationEventDropdown('nation_event');
+    // nation_event + holiday_type are rendered server-side
 
     // Load Data Button
     $('#loadDataBtn').on('click', function() {

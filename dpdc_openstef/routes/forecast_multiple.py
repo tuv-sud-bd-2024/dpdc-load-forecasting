@@ -14,6 +14,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 HOLIDAY_CODES_CSV_PATH = Path(__file__).resolve().parent.parent / "static" / "config" / "Holiday_Codes.csv"
+NATIONAL_EVENTS_CSV_PATH = (
+    Path(__file__).resolve().parent.parent / "static" / "config" / "National_Event_Codes.csv"
+)
 
 def _load_holiday_type_options() -> List[Dict[str, Any]]:
     """
@@ -52,6 +55,43 @@ def _load_holiday_type_options() -> List[Dict[str, Any]]:
     return options
 
 
+def _load_national_event_options() -> List[Dict[str, Any]]:
+    """
+    Load national event options from National_Event_Codes.csv.
+
+    Returns list entries shaped like:
+      {"code_int": 0, "code_str": "0", "national_event_name": "No Event"}
+    """
+    if not NATIONAL_EVENTS_CSV_PATH.exists():
+        raise FileNotFoundError(
+            f"National events CSV not found at expected path: {NATIONAL_EVENTS_CSV_PATH}"
+        )
+
+    options: List[Dict[str, Any]] = []
+    with NATIONAL_EVENTS_CSV_PATH.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code_str = (row.get("Code") or "").strip()
+            event_name = (row.get("National_Event_Name") or "").strip()
+            if not code_str or not event_name:
+                continue
+            try:
+                code_int = int(code_str)
+            except ValueError:
+                logger.warning(f"Skipping invalid national event code: {code_str!r}")
+                continue
+            options.append(
+                {
+                    "code_int": code_int,
+                    "code_str": code_str,
+                    "national_event_name": event_name,
+                }
+            )
+
+    options.sort(key=lambda x: x["code_int"])
+    return options
+
+
 @router.get("/forecast-multiple", response_class=HTMLResponse)
 async def forecast_multiple_page(request: Request):
     """Forecast Multiple Models page"""
@@ -62,6 +102,7 @@ async def forecast_multiple_page(request: Request):
             "active_page": "forecast-multiple", 
             "available_models": ModelService.get_trained_models(),
             "holiday_type_options": _load_holiday_type_options(),
+            "national_event_options": _load_national_event_options(),
         }
     )
 
